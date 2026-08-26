@@ -30,6 +30,7 @@ import {
   X,
 } from "@phosphor-icons/react";
 import { demoExperiment } from "./data/demoExperiment.js";
+import { syncDemoExperiment } from "./lib/apiClient.js";
 import { analyzeExperiment } from "./lib/experiment.js";
 
 const navGroups = [
@@ -164,7 +165,17 @@ export function App() {
   const [snapshot, setSnapshot] = useState("Aug 25, 2026 09:00 PT");
   const [decisionOpen, setDecisionOpen] = useState(false);
   const [toast, setToast] = useState("");
-  const activeStageCopy = useMemo(() => stages.find((stage) => stage.id === activeStage)?.copy, [activeStage]);
+  const [liveData, setLiveData] = useState({ status: "loading", ingestion: null, analysis: null, error: "" });
+  const liveStatusCopy = liveData.status === "loading" ? "Connecting to API…" : liveData.status === "ready" ? `API connected · ${liveData.ingestion.assignments} assignments · ${liveData.ingestion.exposures} exposures · ${liveData.ingestion.outcomes} outcomes` : "API offline · showing seeded snapshot";
+  const activeStageCopy = useMemo(() => `${stages.find((stage) => stage.id === activeStage)?.copy} · ${liveStatusCopy}`, [activeStage, liveStatusCopy]);
+
+  useEffect(() => {
+    let mounted = true;
+    syncDemoExperiment()
+      .then((result) => { if (mounted) setLiveData({ status: "ready", ingestion: result.ingestion, analysis: result.analysis, error: "" }); })
+      .catch((error) => { if (mounted) setLiveData({ status: "offline", ingestion: null, analysis: null, error: error.message }); });
+    return () => { mounted = false; };
+  }, []);
 
   const showToast = (message) => { setToast(message); window.setTimeout(() => setToast(""), 2800); };
   const exportReport = () => showToast("Reproducible report queued · commit a1b2c3d");
