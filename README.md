@@ -2,9 +2,9 @@
 
 Evidence Console is an open-source workspace for designing, validating, and reviewing A/B experiments with a transparent LTV calculation trail.
 
-The current release is a frontend prototype built around one core job: help a product or data team decide whether an experiment should ship without hiding the assumptions behind the result.
+The current release is a runnable MVP built around one core job: help a product or data team decide whether an experiment should ship without hiding the assumptions behind the result.
 
-## What is in this prototype
+## What is in this MVP
 
 - A four-stage experiment storyline: Hypothesis → Assignment → Evidence → Decision.
 - Control/Treatment outcome review with uncertainty intervals and synthetic data.
@@ -12,6 +12,9 @@ The current release is a frontend prototype built around one core job: help a pr
 - A versioned Metric Contract with explicit unit, numerator, denominator, exposure event, window, and guardrails.
 - A Formula Trace that separates Revenue LTV from Contribution LTV.
 - Interactive LTV mode switching, snapshot selection, contract expansion, stage navigation, Decision Brief, and reproducible-report feedback.
+- A pure JavaScript analysis layer for deterministic assignment, SRM detection, binary Frequentist/Bayesian analysis, continuous-metric analysis, and Metric Contract validation.
+
+The analysis API and its assumptions are documented in [docs/analysis-engine.md](docs/analysis-engine.md).
 
 ## LTV contract
 
@@ -49,7 +52,7 @@ npm install --prefer-offline --no-audit --no-fund
 npm run dev
 ```
 
-The app is frontend-only for now and uses synthetic data. Build validation is available with:
+The app runs locally with a seeded synthetic experiment. The analysis engine is separated from the UI so it can later be connected to a warehouse adapter or API. Build validation is available with:
 
 ```bash
 npm run build
@@ -58,11 +61,10 @@ npm test
 
 ## Project status
 
-This is an early product prototype, not a production experimentation service. The next implementation layers are:
+This is an early open-source MVP, not a production experimentation service. The next implementation layers are:
 
 - machine-readable Metric Contract schemas;
-- warehouse adapters and exposure-aligned event models;
-- frequentist and Bayesian analyzers;
+- warehouse adapters and event ingestion;
 - cohort retention and survival-based LTV estimators;
 - reproducible report export and CLI workflows.
 

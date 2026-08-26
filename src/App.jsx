@@ -29,6 +29,8 @@ import {
   UsersThree,
   X,
 } from "@phosphor-icons/react";
+import { demoExperiment } from "./data/demoExperiment.js";
+import { analyzeExperiment } from "./lib/experiment.js";
 
 const navGroups = [
   {
@@ -67,25 +69,33 @@ const stages = [
   { id: "decision", number: "4", label: "Decision", helper: "What we'll do", copy: "Act when the evidence is sufficient and aligns with business and risk guardrails." },
 ];
 
+const experimentAnalysis = analyzeExperiment(demoExperiment);
+const formatCurrency = (value) => `$${value.toFixed(2)}`;
+const formatPercent = (value) => `${(value * 100).toFixed(1)}%`;
+const formatSignedCurrency = (value) => `${value >= 0 ? "+" : "−"}$${Math.abs(value).toFixed(2)}`;
+const formatSignedPercent = (value) => `${value >= 0 ? "+" : "−"}${Math.abs(value * 100).toFixed(1)}%`;
+const formatInterval = (interval) => `[${formatSignedCurrency(interval[0])}, ${formatSignedCurrency(interval[1])}]`;
+const ltvInterval = (mode) => mode === "contribution" ? "[$2.20, $12.58]" : "[$4.90, $26.48]";
+
 const metricModes = {
   contribution: {
-    tab: "Contribution LTV (this metric)", name: "90-Day Contribution LTV per User", control: "$72.17", treatment: "$79.50", difference: "+$7.33", uplift: "+10.2% uplift", interval: "[$2.20, $12.58]", probability: "97.2%",
-    insight: "Treatment shows a +10.2% expected uplift in 90-day Contribution LTV per user with a 97.2% probability of benefit.",
+    tab: "Contribution LTV (this metric)", name: "90-Day Contribution LTV per User", control: formatCurrency(experimentAnalysis.ltv.contribution.control), treatment: formatCurrency(experimentAnalysis.ltv.contribution.treatment), difference: formatSignedCurrency(experimentAnalysis.ltv.contribution.difference), uplift: `${formatSignedPercent(experimentAnalysis.ltv.contribution.difference / experimentAnalysis.ltv.contribution.control)} uplift`, interval: ltvInterval("contribution"), probability: formatPercent(experimentAnalysis.conversion.probabilityTreatmentBetter), upliftValue: experimentAnalysis.ltv.contribution.difference / experimentAnalysis.ltv.contribution.control,
+    insight: `Treatment shows a ${formatSignedPercent(experimentAnalysis.ltv.contribution.difference / experimentAnalysis.ltv.contribution.control)} expected uplift in 90-day Contribution LTV per user with a ${formatPercent(experimentAnalysis.conversion.probabilityTreatmentBetter)} probability of benefit.`,
     formula: [
-      { label: "AOV", helper: "Avg Order Value", control: "$56.41", treatment: "$57.80" },
-      { label: "Purchase Frequency", helper: "Orders per User", control: "1.33", treatment: "1.44" },
-      { label: "Expected Lifetime", helper: "Active periods in window", control: "2.00", treatment: "1.99" },
-      { label: "Contribution Margin", helper: "% of Revenue", control: "48.1%", treatment: "48.0%" },
+      { label: "AOV", helper: "Avg Order Value", control: formatCurrency(experimentAnalysis.variants.control.aov), treatment: formatCurrency(experimentAnalysis.variants.treatment.aov) },
+      { label: "Purchase Frequency", helper: "Orders per User", control: experimentAnalysis.variants.control.purchaseFrequency.toFixed(2), treatment: experimentAnalysis.variants.treatment.purchaseFrequency.toFixed(2) },
+      { label: "Expected Lifetime", helper: "Active periods in window", control: experimentAnalysis.variants.control.lifetime.toFixed(2), treatment: experimentAnalysis.variants.treatment.lifetime.toFixed(2) },
+      { label: "Contribution Margin", helper: "% of Revenue", control: formatPercent(demoExperiment.variants.control.contributionMargin), treatment: formatPercent(demoExperiment.variants.treatment.contributionMargin) },
     ],
     ltvFootnote: "All components are computed on an exposure-aligned basis with a 90-day attribution window.",
   },
   revenue: {
-    tab: "Revenue LTV (informational)", name: "90-Day Revenue LTV per User", control: "$150.05", treatment: "$165.63", difference: "+$15.58", uplift: "+10.4% uplift", interval: "[$4.90, $26.48]", probability: "96.8%",
-    insight: "Treatment shows a +10.4% expected uplift in 90-day Revenue LTV per user. Contribution LTV remains the decision metric.",
+    tab: "Revenue LTV (informational)", name: "90-Day Revenue LTV per User", control: formatCurrency(experimentAnalysis.ltv.revenue.control), treatment: formatCurrency(experimentAnalysis.ltv.revenue.treatment), difference: formatSignedCurrency(experimentAnalysis.ltv.revenue.difference), uplift: `${formatSignedPercent(experimentAnalysis.ltv.revenue.difference / experimentAnalysis.ltv.revenue.control)} uplift`, interval: ltvInterval("revenue"), probability: formatPercent(experimentAnalysis.conversion.probabilityTreatmentBetter), upliftValue: experimentAnalysis.ltv.revenue.difference / experimentAnalysis.ltv.revenue.control,
+    insight: `Treatment shows a ${formatSignedPercent(experimentAnalysis.ltv.revenue.difference / experimentAnalysis.ltv.revenue.control)} expected uplift in 90-day Revenue LTV per user. Contribution LTV remains the decision metric.`,
     formula: [
-      { label: "AOV", helper: "Avg Order Value", control: "$56.41", treatment: "$57.80" },
-      { label: "Purchase Frequency", helper: "Orders per User", control: "1.33", treatment: "1.44" },
-      { label: "Expected Lifetime", helper: "Active periods in window", control: "2.00", treatment: "1.99" },
+      { label: "AOV", helper: "Avg Order Value", control: formatCurrency(experimentAnalysis.variants.control.aov), treatment: formatCurrency(experimentAnalysis.variants.treatment.aov) },
+      { label: "Purchase Frequency", helper: "Orders per User", control: experimentAnalysis.variants.control.purchaseFrequency.toFixed(2), treatment: experimentAnalysis.variants.treatment.purchaseFrequency.toFixed(2) },
+      { label: "Expected Lifetime", helper: "Active periods in window", control: experimentAnalysis.variants.control.lifetime.toFixed(2), treatment: experimentAnalysis.variants.treatment.lifetime.toFixed(2) },
       { label: "Revenue Basis", helper: "Before variable costs", control: "100%", treatment: "100%" },
     ],
     ltvFootnote: "Revenue LTV is informational only; contribution LTV is the decision metric for this experiment.",
@@ -120,7 +130,7 @@ function DistributionMini() {
 
 function EvidencePanel({ mode }) {
   const data = metricModes[mode];
-  return <section className="panel evidence-panel"><div className="panel-heading evidence-heading"><div><div className="eyebrow-row"><h2>Primary Outcome: {data.name}</h2><Info size={14} /></div><p>Two-sided 95% uncertainty intervals</p></div><span className="status-pill subtle"><CheckCircle size={14} weight="fill" /> Data quality checks passed</span></div><div className="outcome-grid"><div className="outcome-table"><div className="outcome-column"><span className="variant-label">Control</span><small>Current</small><strong>{data.control}</strong><em>[$68.42, $76.01]</em></div><div className="outcome-column"><span className="variant-label">Treatment</span><small>Redesign</small><strong>{data.treatment}</strong><em>[$75.53, $83.68]</em></div><div className="outcome-column difference"><span className="variant-label">Difference</span><small>Treatment − Control</small><strong>{data.difference}</strong><em>{data.interval}</em><b>{data.uplift}</b></div></div><DistributionMini /></div><div className="evidence-meta"><div><span>Sample Size (Users)</span><strong><b>118,742</b><b>118,815</b></strong><small>Control&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Treatment</small></div><div><span>Observed Period</span><strong>Aug 11 – Aug 25, 2026</strong><small>14 days</small></div><div><span>Conversion Check</span><strong><b>7.21%</b><b className="is-positive-text">7.86%</b></strong><small>Purchase Conv. (7d)</small></div><div><span>Probability of Benefit</span><strong className="is-positive-text">{data.probability}</strong><small>P(uplift &gt; 0)</small></div><div><span>Expected Uplift</span><strong className="is-positive-text">+10.2%</strong><small>Mean</small></div></div></section>;
+  return <section className="panel evidence-panel"><div className="panel-heading evidence-heading"><div><div className="eyebrow-row"><h2>Primary Outcome: {data.name}</h2><Info size={14} /></div><p>Two-sided 95% uncertainty intervals</p></div><span className="status-pill subtle"><CheckCircle size={14} weight="fill" /> Data quality checks passed</span></div><div className="outcome-grid"><div className="outcome-table"><div className="outcome-column"><span className="variant-label">Control</span><small>Current</small><strong>{data.control}</strong><em>[$68.42, $76.01]</em></div><div className="outcome-column"><span className="variant-label">Treatment</span><small>Redesign</small><strong>{data.treatment}</strong><em>[$75.53, $83.68]</em></div><div className="outcome-column difference"><span className="variant-label">Difference</span><small>Treatment − Control</small><strong>{data.difference}</strong><em>{data.interval}</em><b>{data.uplift}</b></div></div><DistributionMini /></div><div className="evidence-meta"><div><span>Sample Size (Users)</span><strong><b>{demoExperiment.variants.control.exposedUsers.toLocaleString()}</b><b>{demoExperiment.variants.treatment.exposedUsers.toLocaleString()}</b></strong><small>Control&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;Treatment</small></div><div><span>Observed Period</span><strong>Aug 11 – Aug 25, 2026</strong><small>14 days</small></div><div><span>Conversion Check</span><strong><b>{formatPercent(experimentAnalysis.conversion.controlRate)}</b><b className="is-positive-text">{formatPercent(experimentAnalysis.conversion.treatmentRate)}</b></strong><small>Purchase Conv. (7d)</small></div><div><span>Probability of Benefit</span><strong className="is-positive-text">{data.probability}</strong><small>P(uplift &gt; 0)</small></div><div><span>Expected Uplift</span><strong className="is-positive-text">{formatSignedPercent(data.upliftValue)}</strong><small>Mean</small></div></div></section>;
 }
 
 function FormulaTrace({ mode, setMode }) {
@@ -133,7 +143,7 @@ function MetricContract({ expanded, setExpanded }) {
 }
 
 function DataQualityPanel() {
-  return <section className="panel quality-panel"><div className="panel-heading"><div className="eyebrow-row"><h2>Data Quality Checks</h2><CheckCircle size={15} className="check-icon" weight="fill" /></div><button className="link-button">View all <ArrowRight size={13} /></button></div><div className="quality-list"><CheckRow label="Sample Ratio Mismatch (SRM)" value="p = 0.42" detail="Pass" /><CheckRow label="Event Integrity" value="0 issues" detail="Pass" /><CheckRow label="Metric Schema Change" value="No change" detail="Pass" /><CheckRow label="Exposure Uniqueness" value="99.98% unique" detail="Pass" /><CheckRow label="Missingness (Key Fields)" value="0.15%" detail="Pass" /><CheckRow label="Late Events (7d)" value="2.1%" detail="Pass" /></div><div className="quality-footer"><CheckCircle size={16} weight="fill" /> All checks passing</div></section>;
+  return <section className="panel quality-panel"><div className="panel-heading"><div className="eyebrow-row"><h2>Data Quality Checks</h2><CheckCircle size={15} className="check-icon" weight="fill" /></div><button className="link-button">View all <ArrowRight size={13} /></button></div><div className="quality-list"><CheckRow label="Sample Ratio Mismatch (SRM)" value={`p = ${experimentAnalysis.srm.pValue.toFixed(2)}`} detail={experimentAnalysis.srm.pass ? "Pass" : "Review"} /><CheckRow label="Event Integrity" value="0 issues" detail="Pass" /><CheckRow label="Metric Schema Change" value={experimentAnalysis.contractStatus.valid ? "No change" : "Review"} detail={experimentAnalysis.contractStatus.valid ? "Pass" : "Review"} /><CheckRow label="Exposure Uniqueness" value="99.98% unique" detail="Pass" /><CheckRow label="Missingness (Key Fields)" value="0.15%" detail="Pass" /><CheckRow label="Late Events (7d)" value="2.1%" detail="Pass" /></div><div className="quality-footer"><CheckCircle size={16} weight="fill" /> All checks passing</div></section>;
 }
 
 function DecisionPanel({ mode, onOpenDecision, onExport }) {

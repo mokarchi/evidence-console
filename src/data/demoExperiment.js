@@ -1,0 +1,45 @@
+export const demoExperiment = {
+  id: "exp_20260811_01",
+  name: "Checkout Redesign v1",
+  allocation: 0.5,
+  metricContract: {
+    name: "90-Day Contribution LTV per User",
+    unit: "USD",
+    definition: "Total contribution margin attributable to a user within 90 days of first exposure.",
+    numerator: "Σ (order_revenue − variable_cost − payment_fee − refund_amount)",
+    denominator: "# of exposed users",
+    exposureEvent: "checkout_view",
+    attributionWindow: "90 days from first exposure",
+    guardrails: { minSampleRatio: 0.8, maxSrmPValue: 0.01 },
+  },
+  variants: {
+    control: {
+      exposedUsers: 118742,
+      netRevenue: 56.41 * 133000,
+      completedOrders: 133000,
+      payingCustomers: 100000,
+      period: 1,
+      churnRate: 0.5,
+      contributionMargin: 0.481,
+    },
+    treatment: {
+      exposedUsers: 118815,
+      netRevenue: 57.8 * 144000,
+      completedOrders: 144000,
+      payingCustomers: 100000,
+      period: 1,
+      churnRate: 1 / 1.99,
+      contributionMargin: 0.48,
+    },
+  },
+  conversion: {
+    control: { successes: 8561, total: 118742 },
+    treatment: { successes: 9333, total: 118815 },
+    samples: 15000,
+    seed: 20260825,
+  },
+  revenue: {
+    control: { mean: 150.05, stdDev: 112, total: 118742 },
+    treatment: { mean: 165.63, stdDev: 129, total: 118815 },
+  },
+};
