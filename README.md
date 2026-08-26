@@ -16,6 +16,31 @@ The current release is a runnable MVP built around one core job: help a product 
 
 The analysis API and its assumptions are documented in [docs/analysis-engine.md](docs/analysis-engine.md).
 
+## API
+
+The Worker exposes a small JSON API for local development and future adapters:
+
+```text
+GET  /api/health
+GET  /api/experiments
+POST /api/experiments
+GET  /api/experiments/:id
+POST /api/experiments/:id/assign
+POST /api/experiments/:id/exposure
+POST /api/experiments/:id/outcome
+GET  /api/experiments/:id/analysis
+```
+
+Example assignment flow:
+
+```bash
+curl -X POST http://localhost:4173/api/experiments/exp_demo/assign \
+  -H "content-type: application/json" \
+  -d '{"subjectId":"user_123"}'
+```
+
+The current store is process-local by design. Connect `ExperimentStore` to a durable database or warehouse before using it for production traffic.
+
 ## LTV contract
 
 The prototype uses the following auditable path:

@@ -1,0 +1,57 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { ExperimentStore, handleApiRequest } from "../src/lib/api.js";
+import { demoExperiment } from "../src/data/demoExperiment.js";
+
+const contract = demoExperiment.metricContract;
+
+function request(path, options = {}) {
+  return new Request(`https://example.test${path}`, { headers: { "content-type": "application/json" }, ...options });
+}
+
+test("creates an experiment and persists deterministic assignment", async () => {
+  const store = new ExperimentStore();
+  const createdResponse = await handleApiRequest(request("/api/experiments", { method: "POST", body: JSON.stringify({ name: "Checkout", metricContract: contract }) }), store);
+  assert.equal(createdResponse.status, 201);
+  const { experiment } = await createdResponse.json();
+
+  const first = await handleApiRequest(request(`/api/experiments/${experiment.id}/assign`, { method: "POST", body: JSON.stringify({ subjectId: "user_1" }) }), store);
+  const second = await handleApiRequest(request(`/api/experiments/${experiment.id}/assign`, { method: "POST", body: JSON.stringify({ subjectId: "user_1" }) }), store);
+  const firstAssignment = await first.json();
+  const secondAssignment = await second.json();
+  assert.equal(firstAssignment.assignment.variant, secondAssignment.assignment.variant);
+  assert.equal(firstAssignment.assignment.id, secondAssignment.assignment.id);
+});
+
+test("records idempotent exposure and outcome events", async () => {
+  const store = new ExperimentStore([{ id: "exp_api", name: "API test", metricContract: contract }]);
+  const exposurePayload = JSON.stringify({ subjectId: "user_2", eventName: "checkout_view" });
+  const firstExposure = await handleApiRequest(request("/api/experiments/exp_api/exposure", { method: "POST", body: exposurePayload }), store);
+  const secondExposure = await handleApiRequest(request("/api/experiments/exp_api/exposure", { method: "POST", body: exposurePayload }), store);
+  const first = await firstExposure.json();
+  const second = await secondExposure.json();
+  assert.equal(first.exposure.id, second.exposure.id);
+
+  const outcome = await handleApiRequest(request("/api/experiments/exp_api/outcome", { method: "POST", body: JSON.stringify({ subjectId: "user_2", metric: "purchase_conversion", value: 1 }) }), store);
+  assert.equal(outcome.status, 201);
+  assert.equal((await outcome.json()).outcome.variant, first.exposure.variant);
+});
+
+test("returns analysis from configured aggregates and ingestion counts", async () => {
+  const store = new ExperimentStore([{ ...demoExperiment, id: "exp_analysis", name: "Analysis API" }]);
+  await handleApiRequest(request("/api/experiments/exp_analysis/exposure", { method: "POST", body: JSON.stringify({ subjectId: "user_3" }) }), store);
+  const response = await handleApiRequest(request("/api/experiments/exp_analysis/analysis"), store);
+  const payload = await response.json();
+  assert.equal(response.status, 200);
+  assert.equal(payload.analysis.ready, true);
+  assert.equal(payload.analysis.ingestion.exposures, 1);
+  assert.equal(Number(payload.analysis.result.ltv.contribution.control.toFixed(2)), 72.17);
+});
+
+test("returns useful validation errors", async () => {
+  const store = new ExperimentStore();
+  const response = await handleApiRequest(request("/api/experiments", { method: "POST", body: JSON.stringify({ name: "Missing contract" }) }), store);
+  const payload = await response.json();
+  assert.equal(response.status, 400);
+  assert.match(payload.error, /metricContract is incomplete/);
+});
