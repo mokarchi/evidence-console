@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/mokarchi/evidence-console/main/schemas/stopping-rule.v1.json",
+  "title": "Evidence Console Stopping Rule",
+  "description": "Auditable Bayesian stopping and safety thresholds for an experiment.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "minSampleSize",
+    "minimumRuntimeHours",
+    "maximumRuntimeHours",
+    "minProbabilityTreatmentBetter",
+    "minProbabilityControlBetter",
+    "minRelativeUplift",
+    "maxSrmPValue"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "evidence-console.stopping-rule/v1"
+    },
+    "minSampleSize": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "minimumRuntimeHours": {
+      "type": "number",
+      "minimum": 0
+    },
+    "maximumRuntimeHours": {
+      "type": "number",
+      "exclusiveMinimum": 0
+    },
+    "minProbabilityTreatmentBetter": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "maximum": 1
+    },
+    "minProbabilityControlBetter": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "maximum": 1
+    },
+    "minRelativeUplift": {
+      "type": "number",
+      "minimum": 0
+    },
+    "maxSrmPValue": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "maximum": 1
+    }
+  }
+}

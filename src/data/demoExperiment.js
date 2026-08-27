@@ -2,6 +2,16 @@ export const demoExperiment = {
   id: "exp_20260811_01",
   name: "Checkout Redesign v1",
   allocation: 0.5,
+  stoppingRule: {
+    schemaVersion: "evidence-console.stopping-rule/v1",
+    minSampleSize: 1000,
+    minimumRuntimeHours: 24,
+    maximumRuntimeHours: 336,
+    minProbabilityTreatmentBetter: 0.95,
+    minProbabilityControlBetter: 0.95,
+    minRelativeUplift: 0.03,
+    maxSrmPValue: 0.01,
+  },
   metricContract: {
     schemaVersion: "evidence-console.metric-contract/v1",
     name: "90-Day Contribution LTV per User",

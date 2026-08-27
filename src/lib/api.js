@@ -2,6 +2,7 @@ import { assignVariant, analyzeExperiment, validateMetricContract } from "./expe
 import { ingestEvents } from "./eventAdapter.js";
 import { ApiError } from "./errors.js";
 import { metricContractSchema, normalizeMetricContract } from "./metricContract.js";
+import { normalizeStoppingRule, runExperimentMonitoring, stoppingRuleSchema, validateStoppingRule } from "./monitoring.js";
 import { buildExperimentReport, renderMarkdownReport } from "./report.js";
 import { adjustBenjaminiHochberg, analyzeSurvivalByVariant } from "./survival.js";
 
@@ -84,7 +85,11 @@ export class ExperimentStore {
     this.assignments.clear();
     this.exposures.clear();
     this.outcomes.clear();
-    (snapshot.experiments ?? []).forEach((experiment) => this.experiments.set(experiment.id, clone(experiment)));
+    (snapshot.experiments ?? []).forEach((experiment) => {
+      const metricContract = normalizeMetricContract(experiment.metricContract ?? {});
+      const stoppingRule = normalizeStoppingRule(experiment.stoppingRule, metricContract);
+      this.experiments.set(experiment.id, { ...clone(experiment), metricContract: clone(metricContract), stoppingRule: clone(stoppingRule) });
+    });
     for (const experiment of this.experiments.values()) {
       this.assignments.set(experiment.id, new Map());
       this.exposures.set(experiment.id, new Map());
@@ -106,6 +111,9 @@ export class ExperimentStore {
     const metricContract = normalizeMetricContract(input.metricContract ?? {});
     const contractStatus = validateMetricContract(metricContract);
     if (!contractStatus.valid) throw new ApiError(400, "metricContract is incomplete", contractStatus.errors);
+    const stoppingRule = normalizeStoppingRule(input.stoppingRule, metricContract);
+    const stoppingRuleStatus = validateStoppingRule(stoppingRule);
+    if (!stoppingRuleStatus.valid) throw new ApiError(400, "stoppingRule is invalid", stoppingRuleStatus.errors);
     const id = input.id ? requireString(input.id, "id") : makeId("exp");
     if (this.experiments.has(id)) throw new ApiError(409, `Experiment ${id} already exists`);
     const analysisInput = input.analysisInput ?? (input.variants && input.conversion && input.revenue ? {
@@ -120,6 +128,7 @@ export class ExperimentStore {
       allocation: input.allocation ?? 0.5,
       status: input.status ?? "draft",
       metricContract: clone(metricContract),
+      stoppingRule: clone(stoppingRule),
       analysisInput: analysisInput ? clone(analysisInput) : null,
       createdAt: input.createdAt ?? now(),
       updatedAt: now(),
@@ -322,6 +331,11 @@ export class ExperimentStore {
     const result = analyzeExperiment({ ...experiment.analysisInput, id: experiment.id, allocation: experiment.allocation, metricContract: experiment.metricContract });
     return { ready: true, ingestion, result: survivalLtv ? { ...result, survivalLtv } : result };
   }
+
+  async getMonitoring(id, options = {}) {
+    const experiment = requireExperiment(this.experiments, id);
+    return runExperimentMonitoring({ experiment, analysis: this.getAnalysis(id), ...options });
+  }
 }
 
 export const defaultStore = new ExperimentStore();
@@ -348,9 +362,10 @@ export async function handleApiRequest(request, store = defaultStore) {
   try {
     if (url.pathname === "/api/health" && request.method === "GET") return json({ ok: true, service: "evidence-console-api" });
     if (url.pathname === "/api/metric-contract/schema" && request.method === "GET") return json({ schema: metricContractSchema });
+    if (url.pathname === "/api/stopping-rule/schema" && request.method === "GET") return json({ schema: stoppingRuleSchema });
     if (url.pathname === "/api/experiments" && request.method === "GET") return json({ experiments: store.listExperiments() });
     if (url.pathname === "/api/experiments" && request.method === "POST") { const experiment = store.createExperiment(await readJson(request)); await store.flush(); return json({ experiment }, 201); }
-    const match = url.pathname.match(/^\/api\/experiments\/([^/]+)(?:\/(assign|exposure|outcome|analysis|segments|import|report))?$/);
+    const match = url.pathname.match(/^\/api\/experiments\/([^/]+)(?:\/(assign|exposure|outcome|analysis|segments|import|report|monitor))?$/);
     if (!match) throw new ApiError(404, "API route was not found");
     const [, id, action] = match;
     if (!action && request.method === "GET") return json({ experiment: store.getExperimentSummary(id) });
@@ -360,6 +375,7 @@ export async function handleApiRequest(request, store = defaultStore) {
     if (action === "import" && request.method === "POST") { const result = store.importEvents(id, await readJson(request)); await store.flush(); return json({ result }, result.skipped > 0 ? 207 : 201); }
     if (action === "analysis" && request.method === "GET") return json({ analysis: store.getAnalysis(id) });
     if (action === "segments" && request.method === "GET") return json({ analysis: store.getSegmentAnalysis(id, url.searchParams.get("field") ?? "segment") });
+    if (action === "monitor" && request.method === "GET") return json({ monitor: await store.getMonitoring(id, { now: url.searchParams.get("now") ?? undefined }) });
     if (action === "report" && request.method === "GET") {
       const analysis = store.getAnalysis(id);
       const segmentField = url.searchParams.get("segmentField");

@@ -28,6 +28,7 @@ The Worker exposes a small JSON API for local development and future adapters:
 ```text
 GET  /api/health
 GET  /api/metric-contract/schema
+GET  /api/stopping-rule/schema
 GET  /api/experiments
 POST /api/experiments
 GET  /api/experiments/:id
@@ -35,6 +36,7 @@ POST /api/experiments/:id/assign
 POST /api/experiments/:id/exposure
 POST /api/experiments/:id/outcome
 GET  /api/experiments/:id/analysis
+GET  /api/experiments/:id/monitor
 GET  /api/experiments/:id/segments?field=device
 POST /api/experiments/:id/import
 GET  /api/experiments/:id/report
@@ -68,6 +70,8 @@ npm run cli -- report --experiment exp_20260811_01 --format md --output experime
 ```
 
 The default data file is `.data/experiments.json`; override it with `--data path/to/experiments.json`. `validate` and `import` accept `-` as the input path to read from stdin. The package also exposes the `evidence-console` binary when installed or linked locally.
+
+`monitor` evaluates the versioned stopping rule and emits deduplicable alerts as JSON. Pass `--webhook https://…` to deliver those alerts through the generic webhook notifier. It is designed to run from an external scheduler every 15 minutes; it exits `1` for blocked/review states or notification failures.
 
 ## Warehouse adapter
 
@@ -170,7 +174,7 @@ npm test
 This is an early open-source MVP, not a production experimentation service. The next implementation layers are:
 
 - vendor-specific connection packages and partitioned warehouse sync;
-- scheduled experiment monitoring and alert delivery.
+- vendor-specific alert adapters and durable alert deduplication.
 
 ## License
 

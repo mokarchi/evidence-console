@@ -4,6 +4,7 @@ import { readFile, writeFile } from "node:fs/promises";
 import { extname, resolve } from "node:path";
 import { ExperimentStore } from "../src/lib/api.js";
 import { JsonFilePersistence } from "../src/lib/filePersistence.node.js";
+import { runExperimentMonitoring, WebhookNotifier } from "../src/lib/monitoring.js";
 import { buildExperimentReport, renderMarkdownReport } from "../src/lib/report.js";
 import { METRIC_CONTRACT_SCHEMA_VERSION, metricContractSchema, normalizeMetricContract, validateMetricContract } from "../src/lib/metricContract.js";
 
@@ -163,8 +164,19 @@ async function reportCommand(options, positionals) {
   }
 }
 
+async function monitorCommand(options, positionals) {
+  const experimentId = option(options, "experiment", "id") ?? positionals[0];
+  if (!experimentId) throw new CliError("Provide an experiment with --experiment <id>");
+  const { resolvedPath, store } = await loadStore(option(options, "data"));
+  const webhookUrl = option(options, "webhook");
+  const notifier = webhookUrl ? new WebhookNotifier({ url: webhookUrl }) : undefined;
+  const monitor = await runExperimentMonitoring({ experiment: store.getExperiment(experimentId), analysis: store.getAnalysis(experimentId), now: option(options, "now"), notifier });
+  printJson({ ...monitor, dataPath: resolvedPath });
+  if (["blocked", "review"].includes(monitor.evaluation.status) || monitor.notifications.failures.length > 0) process.exitCode = 1;
+}
+
 function printHelp() {
-  process.stdout.write(`Evidence Console CLI\n\nUsage:\n  npm run cli -- validate --contract <path> [--json]\n  npm run cli -- import --experiment <id> --events <path> [--format json|csv] [--data <path>]\n  npm run cli -- report --experiment <id> [--format json|md] [--segment-field <field>] [--output <path>] [--data <path>]\n\nDefaults:\n  Data file: ${DEFAULT_DATA_PATH}\n  Contract schema: ${METRIC_CONTRACT_SCHEMA_VERSION}\n  JSON report is written to stdout unless --output is provided.\n\nUse - as an input path to read JSON, CSV, or a contract from stdin.\n`);
+  process.stdout.write(`Evidence Console CLI\n\nUsage:\n  npm run cli -- validate --contract <path> [--json]\n  npm run cli -- import --experiment <id> --events <path> [--format json|csv] [--data <path>]\n  npm run cli -- report --experiment <id> [--format json|md] [--segment-field <field>] [--output <path>] [--data <path>]\n  npm run cli -- monitor --experiment <id> [--now <ISO timestamp>] [--webhook <URL>] [--data <path>]\n\nDefaults:\n  Data file: ${DEFAULT_DATA_PATH}\n  Contract schema: ${METRIC_CONTRACT_SCHEMA_VERSION}\n  JSON report is written to stdout unless --output is provided.\n  monitor returns exit code 1 for blocked/review states or notification failures.\n\nUse - as an input path to read JSON, CSV, or a contract from stdin.\n`);
 }
 
 async function main() {
@@ -177,6 +189,7 @@ async function main() {
   if (command === "validate") return validateCommand(options, positionals);
   if (command === "import") return importCommand(options, positionals);
   if (command === "report") return reportCommand(options, positionals);
+  if (command === "monitor") return monitorCommand(options, positionals);
   throw new CliError(`Unknown command: ${command}. Use --help for usage.`);
 }
 

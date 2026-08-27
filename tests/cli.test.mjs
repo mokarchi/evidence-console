@@ -58,7 +58,13 @@ test("imports JSON and CSV events, then writes a reproducible report", async () 
     const persistence = new JsonFilePersistence(dataPath);
     const store = new ExperimentStore();
     store.createExperiment({ ...demoExperiment, id: "exp_cli" });
+    store.createExperiment({ ...demoExperiment, id: "exp_cli_monitor", createdAt: "2026-08-25T00:00:00.000Z" });
     await persistence.save(store.snapshot());
+
+    const monitor = await runCli(["monitor", "--experiment", "exp_cli_monitor", "--data", dataPath, "--now", "2026-08-27T00:00:00.000Z"]);
+    assert.equal(monitor.code, 0);
+    assert.equal(JSON.parse(monitor.stdout).evaluation.decision, "ship_treatment");
+    assert.equal(JSON.parse(monitor.stdout).alerts[0].fingerprint, "exp_cli_monitor:stopped:ship_treatment");
 
     const eventsPath = join(directory, "events.json");
     await writeFile(eventsPath, JSON.stringify([{ type: "exposure", subjectId: "cli_json_user", eventName: "checkout_view" }]), "utf8");

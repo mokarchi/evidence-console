@@ -80,6 +80,25 @@ The CLI uses the same `ExperimentStore`, persistence format, event adapter, and 
 
 The adapter rejects unsafe table identifiers and rows returned for another experiment. It does not own authentication, connection pooling, partition scheduling, or persistence; the host application supplies those concerns and saves `store.snapshot()` after a successful import. Use `named` parameters for clients such as BigQuery, `numbered` for `$1`-style clients, or `positional` for `?`-style clients.
 
+## Scheduled monitoring and alerts
+
+`src/lib/monitoring.js` evaluates a versioned stopping rule with four gates: minimum sample, minimum runtime, SRM safety, and Bayesian probability plus practical uplift. The result distinguishes `running`, `stopped`, `blocked`, and `review` states. Treatment can stop on `ship_treatment`, control can stop on `keep_control`, and SRM failure always yields `hold`.
+
+The API exposes the evaluated result at:
+
+```text
+GET /api/experiments/:id/monitor
+GET /api/stopping-rule/schema
+```
+
+For scheduler-friendly execution, use:
+
+```text
+npm run cli -- monitor --experiment <id> --webhook https://alerts.example/hook
+```
+
+Webhook delivery is injected and testable; the monitor uses a stable alert fingerprint (`experimentId:status:decision`) so the receiving system can deduplicate repeated scheduler runs.
+
 ## Raw-event survival LTV
 
 When an experiment has no configured aggregate analysis input, the API can derive LTV directly from persisted outcome events. Add period-level outcomes using:

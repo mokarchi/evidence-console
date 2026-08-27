@@ -53,10 +53,11 @@ export async function syncDemoExperiment() {
     await request(`/api/experiments/${experiment.id}/outcome`, { method: "POST", body: JSON.stringify({ id: `demo_v2_retention_${subjectId}_2`, subjectId, metric: "retention", value: retainedAtPeriodTwo ? 1 : 0, period: 2, censored: retainedAtPeriodTwo, dimensions: { device }, occurredAt: "2026-08-25T09:22:00.000Z" }) });
     await request(`/api/experiments/${experiment.id}/outcome`, { method: "POST", body: JSON.stringify({ id: `demo_v2_contribution_${subjectId}_2`, subjectId, metric: "contribution_margin", value: retainedAtPeriodTwo ? 8 + index : 4, period: 2, dimensions: { device }, occurredAt: "2026-08-25T09:23:00.000Z" }) });
   }
-  const [summary, analysis, segmentAnalysis] = await Promise.all([
+  const [summary, analysis, segmentAnalysis, monitor] = await Promise.all([
     request(`/api/experiments/${experiment.id}`),
     request(`/api/experiments/${experiment.id}/analysis`),
     request(`/api/experiments/${experiment.id}/segments?field=device`),
+    request(`/api/experiments/${experiment.id}/monitor`),
   ]);
-  return { experiment: summary.experiment, ingestion: summary.experiment.ingestion, analysis: analysis.analysis, segmentAnalysis: segmentAnalysis.analysis };
+  return { experiment: summary.experiment, ingestion: summary.experiment.ingestion, analysis: analysis.analysis, segmentAnalysis: segmentAnalysis.analysis, monitor: monitor.monitor };
 }

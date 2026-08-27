@@ -33,6 +33,22 @@ test("serves the machine-readable metric contract schema", async () => {
   assert.ok(payload.schema.required.includes("guardrails"));
 });
 
+test("serves the stopping rule schema and evaluates experiment monitoring", async () => {
+  const schemaResponse = await handleApiRequest(request("/api/stopping-rule/schema"));
+  const schemaPayload = await schemaResponse.json();
+  assert.equal(schemaResponse.status, 200);
+  assert.equal(schemaPayload.schema.properties.schemaVersion.const, "evidence-console.stopping-rule/v1");
+
+  const store = new ExperimentStore([{ ...demoExperiment, id: "exp_monitor_api", createdAt: "2026-08-25T00:00:00.000Z" }]);
+  const response = await handleApiRequest(request("/api/experiments/exp_monitor_api/monitor?now=2026-08-27T00:00:00.000Z"), store);
+  const payload = await response.json();
+  assert.equal(response.status, 200);
+  assert.equal(payload.monitor.schemaVersion, "evidence-console.monitoring/v1");
+  assert.equal(payload.monitor.evaluation.status, "stopped");
+  assert.equal(payload.monitor.evaluation.decision, "ship_treatment");
+  assert.equal(payload.monitor.alerts[0].type, "stopping_rule");
+});
+
 test("records idempotent exposure and outcome events", async () => {
   const store = new ExperimentStore([{ id: "exp_api", name: "API test", metricContract: contract }]);
   const exposurePayload = JSON.stringify({ subjectId: "user_2", eventName: "checkout_view" });
@@ -153,6 +169,7 @@ test("returns JSON and Markdown reports", async () => {
   assert.equal(jsonResponse.status, 200);
   assert.equal(jsonPayload.report.schemaVersion, "evidence-console.report/v1");
   assert.equal(jsonPayload.report.metricContractSchemaVersion, "evidence-console.metric-contract/v1");
+  assert.equal(jsonPayload.report.experiment.stoppingRule.schemaVersion, "evidence-console.stopping-rule/v1");
   assert.equal(jsonPayload.report.analysis.ltv.contribution.control.toFixed(2), "72.17");
 
   const markdownResponse = await handleApiRequest(request("/api/experiments/exp_report/report?format=md"), store);
