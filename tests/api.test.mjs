@@ -71,3 +71,18 @@ test("imports CSV assignment, exposure, and outcome events", async () => {
   const summary = await handleApiRequest(request("/api/experiments/exp_import"), store);
   assert.equal((await summary.json()).experiment.ingestion.outcomes, 1);
 });
+
+test("returns JSON and Markdown reports", async () => {
+  const store = new ExperimentStore([{ ...demoExperiment, id: "exp_report" }]);
+  const jsonResponse = await handleApiRequest(request("/api/experiments/exp_report/report"), store);
+  const jsonPayload = await jsonResponse.json();
+  assert.equal(jsonResponse.status, 200);
+  assert.equal(jsonPayload.report.schemaVersion, "evidence-console.report/v1");
+  assert.equal(jsonPayload.report.analysis.ltv.contribution.control.toFixed(2), "72.17");
+
+  const markdownResponse = await handleApiRequest(request("/api/experiments/exp_report/report?format=md"), store);
+  const markdown = await markdownResponse.text();
+  assert.equal(markdownResponse.headers.get("content-type"), "text/markdown; charset=utf-8");
+  assert.match(markdown, /## Metric contract/);
+  assert.match(markdown, /Contribution LTV/);
+});

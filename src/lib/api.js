@@ -1,6 +1,7 @@
 import { assignVariant, analyzeExperiment, validateMetricContract } from "./experiment.js";
 import { ingestEvents } from "./eventAdapter.js";
 import { ApiError } from "./errors.js";
+import { buildExperimentReport, renderMarkdownReport } from "./report.js";
 
 const clone = (value) => JSON.parse(JSON.stringify(value));
 
@@ -208,6 +209,10 @@ function json(data, status = 200) {
   return new Response(JSON.stringify(data), { status, headers: { "content-type": "application/json; charset=utf-8", "access-control-allow-origin": "*" } });
 }
 
+function textResponse(data, status = 200, contentType = "text/plain; charset=utf-8") {
+  return new Response(data, { status, headers: { "content-type": contentType, "content-disposition": "attachment; filename=experiment-report.md", "access-control-allow-origin": "*" } });
+}
+
 async function readJson(request) {
   try {
     return await request.json();
@@ -223,7 +228,7 @@ export async function handleApiRequest(request, store = defaultStore) {
     if (url.pathname === "/api/health" && request.method === "GET") return json({ ok: true, service: "evidence-console-api" });
     if (url.pathname === "/api/experiments" && request.method === "GET") return json({ experiments: store.listExperiments() });
     if (url.pathname === "/api/experiments" && request.method === "POST") { const experiment = store.createExperiment(await readJson(request)); await store.flush(); return json({ experiment }, 201); }
-    const match = url.pathname.match(/^\/api\/experiments\/([^/]+)(?:\/(assign|exposure|outcome|analysis|import))?$/);
+    const match = url.pathname.match(/^\/api\/experiments\/([^/]+)(?:\/(assign|exposure|outcome|analysis|import|report))?$/);
     if (!match) throw new ApiError(404, "API route was not found");
     const [, id, action] = match;
     if (!action && request.method === "GET") return json({ experiment: store.getExperimentSummary(id) });
@@ -232,6 +237,12 @@ export async function handleApiRequest(request, store = defaultStore) {
     if (action === "outcome" && request.method === "POST") { const outcome = store.recordOutcome(id, await readJson(request)); await store.flush(); return json({ outcome }, 201); }
     if (action === "import" && request.method === "POST") { const result = store.importEvents(id, await readJson(request)); await store.flush(); return json({ result }, result.skipped > 0 ? 207 : 201); }
     if (action === "analysis" && request.method === "GET") return json({ analysis: store.getAnalysis(id) });
+    if (action === "report" && request.method === "GET") {
+      const analysis = store.getAnalysis(id);
+      const report = buildExperimentReport({ experiment: store.getExperiment(id), analysis });
+      if (["md", "markdown"].includes(url.searchParams.get("format"))) return textResponse(renderMarkdownReport(report), 200, "text/markdown; charset=utf-8");
+      return json({ report });
+    }
     throw new ApiError(405, "Method is not supported for this route");
   } catch (error) {
     if (error instanceof ApiError) return json({ error: error.message, details: error.details ?? null }, error.status);

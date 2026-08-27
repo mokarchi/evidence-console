@@ -30,6 +30,7 @@ POST /api/experiments/:id/exposure
 POST /api/experiments/:id/outcome
 GET  /api/experiments/:id/analysis
 POST /api/experiments/:id/import
+GET  /api/experiments/:id/report
 ```
 
 Example assignment flow:
@@ -41,6 +42,14 @@ curl -X POST http://localhost:4173/api/experiments/exp_demo/assign \
 ```
 
 Local Vite runs persist to `.data/experiments.json`; the Worker default uses an in-memory store until a durable database or warehouse binding is configured for production traffic.
+
+Reports can be fetched as JSON or Markdown:
+
+```bash
+curl "http://localhost:4173/api/experiments/exp_20260811_01/report?format=md" -o experiment-report.md
+```
+
+GitHub Actions runs `npm test` and `npm run build` on pushes to `main` and on pull requests.
 
 ## LTV contract
 
