@@ -55,6 +55,19 @@ Reports can be fetched as JSON or Markdown:
 curl "http://localhost:4173/api/experiments/exp_20260811_01/report?format=md" -o experiment-report.md
 ```
 
+## CLI
+
+The same local persistence and analysis engine can be used from scripts or CI. The CLI exits with code `1` for an invalid contract or a partial event import, and code `2` for usage or input errors:
+
+```bash
+npm run cli -- validate --contract metric-contract.json --json
+npm run cli -- import --experiment exp_20260811_01 --events events.json
+npm run cli -- import --experiment exp_20260811_01 --events events.csv --format csv
+npm run cli -- report --experiment exp_20260811_01 --format md --output experiment-report.md
+```
+
+The default data file is `.data/experiments.json`; override it with `--data path/to/experiments.json`. `validate` and `import` accept `-` as the input path to read from stdin. The package also exposes the `evidence-console` binary when installed or linked locally.
+
 Raw event imports can derive survival-based LTV when both variants contain period-level `retention` (or `active`) and `contribution_margin` (or `contribution`) outcomes. The optional fields are `period` (a positive integer) and `censored` (a boolean):
 
 ```json
@@ -130,10 +143,9 @@ npm test
 
 ## Project status
 
-This is an early open-source MVP, not a production experimentation service. The next implementation layers are:
+This is an early open-source MVP, not a production experimentation service. The next implementation layer is:
 
-- warehouse adapters and event ingestion;
-- CLI workflows and warehouse adapters.
+- warehouse adapters for production event sources.
 
 ## License
 

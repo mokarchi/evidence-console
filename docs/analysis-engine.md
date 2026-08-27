@@ -60,6 +60,16 @@ Use `assignment`, `exposure`, and `outcome` as event types. Exposure events are 
 
 `GET /api/experiments/:id/report` returns a versioned JSON report by default. Add `?format=md` to receive a downloadable Markdown report containing the metric contract, ingestion summary, LTV trace, conversion analysis, data-quality result, and Bayesian seed.
 
+The same operations are available through `scripts/evidence-console.mjs`:
+
+```text
+npm run cli -- validate --contract metric-contract.json --json
+npm run cli -- import --experiment <id> --events events.json [--data .data/experiments.json]
+npm run cli -- report --experiment <id> --format md --output report.md
+```
+
+The CLI uses the same `ExperimentStore`, persistence format, event adapter, and report renderer as the API. It returns exit code `1` for validation or partial-import failures, making it suitable for a CI gate.
+
 ## Raw-event survival LTV
 
 When an experiment has no configured aggregate analysis input, the API can derive LTV directly from persisted outcome events. Add period-level outcomes using:
