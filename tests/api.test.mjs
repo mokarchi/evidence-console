@@ -55,3 +55,19 @@ test("returns useful validation errors", async () => {
   assert.equal(response.status, 400);
   assert.match(payload.error, /metricContract is incomplete/);
 });
+
+test("imports CSV assignment, exposure, and outcome events", async () => {
+  const store = new ExperimentStore([{ id: "exp_import", name: "Import test", metricContract: contract }]);
+  const csv = [
+    "type,subject_id,event_name,metric,value,occurred_at",
+    "assignment,user_csv_1,,,,2026-08-25T09:00:00.000Z",
+    "exposure,user_csv_1,checkout_view,,,2026-08-25T09:01:00.000Z",
+    "outcome,user_csv_1,,purchase_conversion,1,2026-08-25T09:10:00.000Z",
+  ].join("\n");
+  const response = await handleApiRequest(request("/api/experiments/exp_import/import", { method: "POST", body: JSON.stringify({ format: "csv", data: csv }) }), store);
+  const payload = await response.json();
+  assert.equal(response.status, 201);
+  assert.deepEqual(payload.result, { received: 3, accepted: 3, skipped: 0, errors: [] });
+  const summary = await handleApiRequest(request("/api/experiments/exp_import"), store);
+  assert.equal((await summary.json()).experiment.ingestion.outcomes, 1);
+});

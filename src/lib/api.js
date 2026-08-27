@@ -1,14 +1,8 @@
 import { assignVariant, analyzeExperiment, validateMetricContract } from "./experiment.js";
+import { ingestEvents } from "./eventAdapter.js";
+import { ApiError } from "./errors.js";
 
 const clone = (value) => JSON.parse(JSON.stringify(value));
-
-export class ApiError extends Error {
-  constructor(status, message, details = undefined) {
-    super(message);
-    this.status = status;
-    this.details = details;
-  }
-}
 
 function now() {
   return new Date().toISOString();
@@ -31,12 +25,45 @@ function requireExperiment(experiments, id) {
 }
 
 export class ExperimentStore {
-  constructor(seed = []) {
+  constructor(seed = [], { onChange = null } = {}) {
     this.experiments = new Map();
     this.assignments = new Map();
     this.exposures = new Map();
     this.outcomes = new Map();
+    this.onChange = onChange;
+    this.pendingSave = Promise.resolve();
     seed.forEach((experiment) => this.createExperiment(experiment));
+  }
+
+  snapshot() {
+    return {
+      experiments: [...this.experiments.values()].map((experiment) => clone(experiment)),
+      assignments: [...this.assignments.entries()].map(([experimentId, values]) => ({ experimentId, values: [...values.values()].map((value) => clone(value)) })),
+      exposures: [...this.exposures.entries()].map(([experimentId, values]) => ({ experimentId, values: [...values.values()].map((value) => clone(value)) })),
+      outcomes: [...this.outcomes.entries()].map(([experimentId, values]) => ({ experimentId, values: [...values.values()].map((value) => clone(value)) })),
+    };
+  }
+
+  restore(snapshot = {}) {
+    this.experiments.clear();
+    this.assignments.clear();
+    this.exposures.clear();
+    this.outcomes.clear();
+    (snapshot.experiments ?? []).forEach((experiment) => this.experiments.set(experiment.id, clone(experiment)));
+    for (const experiment of this.experiments.values()) {
+      this.assignments.set(experiment.id, new Map());
+      this.exposures.set(experiment.id, new Map());
+      this.outcomes.set(experiment.id, new Map());
+    }
+    for (const bucket of snapshot.assignments ?? []) this.assignments.set(bucket.experimentId, new Map((bucket.values ?? []).map((value) => [value.subjectId, clone(value)])));
+    for (const bucket of snapshot.exposures ?? []) this.exposures.set(bucket.experimentId, new Map((bucket.values ?? []).map((value) => [`${value.subjectId}:${value.eventName}`, clone(value)])));
+    for (const bucket of snapshot.outcomes ?? []) this.outcomes.set(bucket.experimentId, new Map((bucket.values ?? []).map((value) => [value.id, clone(value)])));
+  }
+
+  async flush() {
+    if (!this.onChange) return;
+    this.pendingSave = this.pendingSave.then(() => this.onChange(this.snapshot()));
+    return this.pendingSave;
   }
 
   createExperiment(input = {}) {
@@ -144,6 +171,11 @@ export class ExperimentStore {
     return clone(outcome);
   }
 
+  importEvents(id, input) {
+    requireExperiment(this.experiments, id);
+    return ingestEvents(this, id, input);
+  }
+
   getIngestionSummary(id) {
     requireExperiment(this.experiments, id);
     const assignments = [...this.assignments.get(id).values()];
@@ -190,14 +222,15 @@ export async function handleApiRequest(request, store = defaultStore) {
   try {
     if (url.pathname === "/api/health" && request.method === "GET") return json({ ok: true, service: "evidence-console-api" });
     if (url.pathname === "/api/experiments" && request.method === "GET") return json({ experiments: store.listExperiments() });
-    if (url.pathname === "/api/experiments" && request.method === "POST") return json({ experiment: store.createExperiment(await readJson(request)) }, 201);
-    const match = url.pathname.match(/^\/api\/experiments\/([^/]+)(?:\/(assign|exposure|outcome|analysis))?$/);
+    if (url.pathname === "/api/experiments" && request.method === "POST") { const experiment = store.createExperiment(await readJson(request)); await store.flush(); return json({ experiment }, 201); }
+    const match = url.pathname.match(/^\/api\/experiments\/([^/]+)(?:\/(assign|exposure|outcome|analysis|import))?$/);
     if (!match) throw new ApiError(404, "API route was not found");
     const [, id, action] = match;
     if (!action && request.method === "GET") return json({ experiment: store.getExperimentSummary(id) });
-    if (action === "assign" && request.method === "POST") return json({ assignment: store.assign(id, (await readJson(request)).subjectId) }, 201);
-    if (action === "exposure" && request.method === "POST") return json({ exposure: store.recordExposure(id, await readJson(request)) }, 201);
-    if (action === "outcome" && request.method === "POST") return json({ outcome: store.recordOutcome(id, await readJson(request)) }, 201);
+    if (action === "assign" && request.method === "POST") { const assignment = store.assign(id, (await readJson(request)).subjectId); await store.flush(); return json({ assignment }, 201); }
+    if (action === "exposure" && request.method === "POST") { const exposure = store.recordExposure(id, await readJson(request)); await store.flush(); return json({ exposure }, 201); }
+    if (action === "outcome" && request.method === "POST") { const outcome = store.recordOutcome(id, await readJson(request)); await store.flush(); return json({ outcome }, 201); }
+    if (action === "import" && request.method === "POST") { const result = store.importEvents(id, await readJson(request)); await store.flush(); return json({ result }, result.skipped > 0 ? 207 : 201); }
     if (action === "analysis" && request.method === "GET") return json({ analysis: store.getAnalysis(id) });
     throw new ApiError(405, "Method is not supported for this route");
   } catch (error) {

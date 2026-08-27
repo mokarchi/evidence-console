@@ -29,6 +29,7 @@ POST /api/experiments/:id/assign
 POST /api/experiments/:id/exposure
 POST /api/experiments/:id/outcome
 GET  /api/experiments/:id/analysis
+POST /api/experiments/:id/import
 ```
 
 Example assignment flow:
@@ -39,7 +40,7 @@ curl -X POST http://localhost:4173/api/experiments/exp_demo/assign \
   -d '{"subjectId":"user_123"}'
 ```
 
-The current store is process-local by design. Connect `ExperimentStore` to a durable database or warehouse before using it for production traffic.
+Local Vite runs persist to `.data/experiments.json`; the Worker default uses an in-memory store until a durable database or warehouse binding is configured for production traffic.
 
 ## LTV contract
 

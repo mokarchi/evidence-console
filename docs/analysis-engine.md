@@ -34,6 +34,18 @@ The demo object in `src/data/demoExperiment.js` separates:
 
 This separation prevents an outcome metric from silently changing its population or attribution window.
 
+## Persistence and event import
+
+The local Vite API uses `JsonFilePersistence` and stores the current state in `.data/experiments.json`. Writes use a temporary file followed by a rename, so a process restart can restore experiments and ingested events without committing local data to Git.
+
+`POST /api/experiments/:id/import` accepts either JSON events or a CSV payload. The normalized event columns are:
+
+```text
+type,subject_id,event_name,metric,value,occurred_at,variant
+```
+
+Use `assignment`, `exposure`, and `outcome` as event types. Exposure events are deduplicated by subject and event name; outcome events can be made idempotent by providing `event_id` (or `id`). Import returns `received`, `accepted`, `skipped`, and row-level errors.
+
 ## Limitations
 
-The current engine is intentionally an MVP. It does not yet ingest raw events, correct for repeated peeking in a Frequentist workflow, model retention as a survival curve, or calculate uncertainty for the LTV product itself. Those layers should be added before using the project for production decisions.
+The current engine is intentionally an MVP. It does not yet provide a production database adapter, correct for repeated peeking in a Frequentist workflow, model retention as a survival curve, or calculate uncertainty for the LTV product itself. Those layers should be added before using the project for production decisions.
