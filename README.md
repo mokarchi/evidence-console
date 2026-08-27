@@ -15,6 +15,7 @@ The current release is a runnable MVP built around one core job: help a product 
 - A pure JavaScript analysis layer for deterministic assignment, SRM detection, binary Frequentist/Bayesian analysis, continuous-metric analysis, and Metric Contract validation.
 - Raw event analysis for retention/contribution observations, including a Kaplan–Meier survival curve and survival-based LTV.
 - Reproducible subject-level bootstrap intervals for survival-based LTV and its treatment effect.
+- Subgroup analysis by event dimensions with Benjamini–Hochberg multiple-comparison correction.
 
 The analysis API and its assumptions are documented in [docs/analysis-engine.md](docs/analysis-engine.md).
 
@@ -31,6 +32,7 @@ POST /api/experiments/:id/assign
 POST /api/experiments/:id/exposure
 POST /api/experiments/:id/outcome
 GET  /api/experiments/:id/analysis
+GET  /api/experiments/:id/segments?field=device
 POST /api/experiments/:id/import
 GET  /api/experiments/:id/report
 ```
@@ -63,6 +65,21 @@ Raw event imports can derive survival-based LTV when both variants contain perio
   "censored": false
 }
 ```
+
+Outcome events can also carry dimensions for subgroup analysis:
+
+```json
+{
+  "type": "outcome",
+  "subjectId": "user_123",
+  "metric": "contribution_margin",
+  "value": 12,
+  "period": 2,
+  "dimensions": { "device": "mobile", "source": "paid" }
+}
+```
+
+Call `/api/experiments/:id/segments?field=device` to compare Survival LTV across device groups. The endpoint returns raw and Benjamini–Hochberg adjusted p-values so subgroup decisions do not treat every exploratory slice as an independent primary test. Add `segmentField=device` to the report query to include the subgroup table in Markdown.
 
 GitHub Actions runs `npm test` and `npm run build` on pushes to `main` and on pull requests.
 

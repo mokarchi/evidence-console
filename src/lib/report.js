@@ -27,6 +27,7 @@ export function buildExperimentReport({ experiment, analysis, generatedAt = new 
     },
     ingestion: analysis.ingestion,
     analysis: analysis.result ?? null,
+    segmentAnalysis: analysis.segmentAnalysis ?? null,
     readiness: { ready: analysis.ready, reason: analysis.reason ?? null },
     reproducibility: {
       bayesianSeed: seed,
@@ -189,6 +190,19 @@ export function renderMarkdownReport(report) {
     }
   }
   lines.push(
+    ...(report.segmentAnalysis?.segments?.length ? [
+      "",
+      "## Segment analysis",
+      "",
+      `- Dimension: ${report.segmentAnalysis.field}`,
+      `- Multiple-comparison correction: ${report.segmentAnalysis.correction} at α = ${report.segmentAnalysis.alpha}`,
+      `- Tested subgroups: ${report.segmentAnalysis.testedSegments}`,
+      `- Ambiguous subjects excluded: ${report.segmentAnalysis.excludedAmbiguousSubjects}`,
+      "",
+      "| Segment | Control LTV | Treatment LTV | Difference | Adjusted p-value | Decision |",
+      "| --- | ---: | ---: | ---: | ---: | --- |",
+      ...report.segmentAnalysis.segments.map((segment) => `| ${segment.value} | $${segment.control.ltv.toFixed(2)} | $${segment.treatment.ltv.toFixed(2)} | $${segment.difference.toFixed(2)} | ${segment.adjustedPValue.toFixed(4)} | ${segment.significant ? "Significant" : "Review"} |`),
+    ] : []),
     "",
     "## Reproducibility",
     "",

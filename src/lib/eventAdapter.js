@@ -58,6 +58,20 @@ function optionalBoolean(value) {
   return value;
 }
 
+function normalizeDimensions(row) {
+  if (row.dimensions !== undefined && row.dimensions !== null && row.dimensions !== "") {
+    if (typeof row.dimensions === "object") return row.dimensions;
+    try {
+      return JSON.parse(row.dimensions);
+    } catch {
+      return row.dimensions;
+    }
+  }
+  const knownDimensions = ["device", "browser", "source", "country", "platform", "channel", "segment"];
+  const dimensions = Object.fromEntries(knownDimensions.filter((field) => row[field] !== undefined && row[field] !== "").map((field) => [field, row[field]]));
+  return Object.keys(dimensions).length ? dimensions : undefined;
+}
+
 export function ingestEvents(store, experimentId, input = {}) {
   const rows = input.format === "csv" ? parseCsv(input.data) : input.events;
   if (!Array.isArray(rows)) throw new ApiError(400, "events must be an array or provide format=csv with data");
@@ -79,6 +93,8 @@ export function ingestEvents(store, experimentId, input = {}) {
           value,
           period: optionalNumber(row.period),
           censored: optionalBoolean(row.censored),
+          segment: row.segment,
+          dimensions: normalizeDimensions(row),
           occurredAt: row.occurredAt ?? row.occurred_at,
         });
       } else {

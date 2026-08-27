@@ -169,6 +169,8 @@ export function bootstrapSurvivalLtv({ control, treatment, seed = 20260827, draw
   const controlSamples = bootstrapVariantSamples(control, random, normalizedDraws);
   const treatmentSamples = bootstrapVariantSamples(treatment, random, normalizedDraws);
   const differenceSamples = controlSamples.map((value, index) => treatmentSamples[index] - value);
+  const positiveDraws = differenceSamples.filter((value) => value > 0).length;
+  const probabilityTreatmentBetter = (positiveDraws + 1) / (differenceSamples.length + 2);
   return {
     method: "subject-level bootstrap",
     seed: Number(seed) >>> 0,
@@ -176,8 +178,24 @@ export function bootstrapSurvivalLtv({ control, treatment, seed = 20260827, draw
     confidenceLevel: normalizedConfidence,
     control: summarizeBootstrap(controlSamples, normalizedConfidence),
     treatment: summarizeBootstrap(treatmentSamples, normalizedConfidence),
-    difference: summarizeBootstrap(differenceSamples, normalizedConfidence),
+    difference: { ...summarizeBootstrap(differenceSamples, normalizedConfidence), pValue: Math.min(1, 2 * Math.min(probabilityTreatmentBetter, 1 - probabilityTreatmentBetter)) },
+    probabilityTreatmentBetter,
   };
+}
+
+export function adjustBenjaminiHochberg(pValues = []) {
+  const adjusted = Array(pValues.length).fill(null);
+  const ranked = pValues
+    .map((value, index) => ({ value: value === null || value === undefined || value === "" ? null : Number(value), index }))
+    .filter(({ value }) => Number.isFinite(value))
+    .sort((left, right) => left.value - right.value);
+  let runningMinimum = 1;
+  for (let index = ranked.length - 1; index >= 0; index -= 1) {
+    const rank = index + 1;
+    runningMinimum = Math.min(runningMinimum, (ranked[index].value * ranked.length) / rank);
+    adjusted[ranked[index].index] = Math.min(1, runningMinimum);
+  }
+  return adjusted;
 }
 
 export function analyzeSurvivalByVariant({ control, treatment, uncertainty = {} } = {}) {

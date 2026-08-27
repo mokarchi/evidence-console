@@ -89,10 +89,10 @@ test("derives survival LTV from raw retention and contribution events", async ()
   };
   const events = Object.entries(subjects).flatMap(([variant, ids]) => ids.flatMap((subjectId, index) => [
     { type: "exposure", subjectId, eventName: "checkout_view" },
-    { type: "outcome", id: `${variant}_${index}_retention_1`, subjectId, metric: "retention", value: 1, period: 1 },
-    { type: "outcome", id: `${variant}_${index}_contribution_1`, subjectId, metric: "contribution_margin", value: 10, period: 1 },
-    { type: "outcome", id: `${variant}_${index}_retention_2`, subjectId, metric: "retention", value: variant === "control" && index === 0 ? 0 : 1, period: 2, censored: variant !== "control" || index === 1 },
-    { type: "outcome", id: `${variant}_${index}_contribution_2`, subjectId, metric: "contribution_margin", value: variant === "control" ? 6 : 8, period: 2 },
+    { type: "outcome", id: `${variant}_${index}_retention_1`, subjectId, metric: "retention", value: 1, period: 1, dimensions: { device: index === 0 ? "mobile" : "desktop" } },
+    { type: "outcome", id: `${variant}_${index}_contribution_1`, subjectId, metric: "contribution_margin", value: 10, period: 1, dimensions: { device: index === 0 ? "mobile" : "desktop" } },
+    { type: "outcome", id: `${variant}_${index}_retention_2`, subjectId, metric: "retention", value: variant === "control" && index === 0 ? 0 : 1, period: 2, censored: variant !== "control" || index === 1, dimensions: { device: index === 0 ? "mobile" : "desktop" } },
+    { type: "outcome", id: `${variant}_${index}_contribution_2`, subjectId, metric: "contribution_margin", value: variant === "control" ? 6 : 8, period: 2, dimensions: { device: index === 0 ? "mobile" : "desktop" } },
   ]));
   const importResponse = await handleApiRequest(request("/api/experiments/exp_survival/import", { method: "POST", body: JSON.stringify({ events }) }), store);
   assert.equal(importResponse.status, 201);
@@ -108,6 +108,32 @@ test("derives survival LTV from raw retention and contribution events", async ()
   assert.equal(payload.analysis.result.survivalLtv.uncertainty.method, "subject-level bootstrap");
   assert.equal(payload.analysis.result.survivalLtv.uncertainty.draws, 1000);
   assert.equal(payload.analysis.result.survivalLtv.uncertainty.difference.interval.length, 2);
+
+  const segmentResponse = await handleApiRequest(request("/api/experiments/exp_survival/segments?field=device"), store);
+  const segmentPayload = await segmentResponse.json();
+  assert.equal(segmentResponse.status, 200);
+  assert.equal(segmentPayload.analysis.field, "device");
+  assert.equal(segmentPayload.analysis.correction, "Benjamini-Hochberg");
+  assert.equal(segmentPayload.analysis.testedSegments, 2);
+  assert.equal(segmentPayload.analysis.segments.length, 2);
+  assert.ok(segmentPayload.analysis.segments.every((segment) => Number.isFinite(segment.adjustedPValue)));
+
+  const ambiguousSubject = findSubject("control", "ambiguous");
+  const ambiguousEvents = [
+    { type: "outcome", id: "ambiguous_retention_1", subjectId: ambiguousSubject, metric: "retention", value: 1, period: 1, dimensions: { device: "mobile" } },
+    { type: "outcome", id: "ambiguous_contribution_1", subjectId: ambiguousSubject, metric: "contribution_margin", value: 10, period: 1, dimensions: { device: "mobile" } },
+    { type: "outcome", id: "ambiguous_retention_2", subjectId: ambiguousSubject, metric: "retention", value: 1, period: 2, dimensions: { device: "desktop" } },
+    { type: "outcome", id: "ambiguous_contribution_2", subjectId: ambiguousSubject, metric: "contribution_margin", value: 10, period: 2, dimensions: { device: "desktop" } },
+  ];
+  await handleApiRequest(request("/api/experiments/exp_survival/import", { method: "POST", body: JSON.stringify({ events: ambiguousEvents }) }), store);
+  const afterAmbiguous = await handleApiRequest(request("/api/experiments/exp_survival/segments?field=device"), store);
+  assert.equal((await afterAmbiguous.json()).analysis.excludedAmbiguousSubjects, 1);
+
+  const reportResponse = await handleApiRequest(request("/api/experiments/exp_survival/report?format=md&segmentField=device"), store);
+  const reportMarkdown = await reportResponse.text();
+  assert.equal(reportResponse.status, 200);
+  assert.match(reportMarkdown, /## Segment analysis/);
+  assert.match(reportMarkdown, /Benjamini-Hochberg/);
 });
 
 test("returns JSON and Markdown reports", async () => {

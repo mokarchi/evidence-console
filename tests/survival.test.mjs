@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { analyzeSurvivalByVariant, buildContributionByPeriod, buildKaplanMeier, calculateSurvivalLtv, buildSurvivalLtv, bootstrapSurvivalLtv } from "../src/lib/survival.js";
+import { adjustBenjaminiHochberg, analyzeSurvivalByVariant, buildContributionByPeriod, buildKaplanMeier, calculateSurvivalLtv, buildSurvivalLtv, bootstrapSurvivalLtv } from "../src/lib/survival.js";
 
 test("builds a Kaplan-Meier retention curve with events and censoring", () => {
   const result = buildKaplanMeier([
@@ -101,4 +101,13 @@ test("calculates deterministic subject-level bootstrap intervals", () => {
   assert.equal(first.difference.interval.length, 2);
   assert.ok(first.difference.standardError >= 0);
   assert.deepEqual(analyzeSurvivalByVariant({ ...input, uncertainty: { seed: 42, draws: 200 } }).uncertainty, first);
+});
+
+test("adjusts subgroup p-values with Benjamini-Hochberg", () => {
+  const first = adjustBenjaminiHochberg([0.01, 0.04, 0.2]);
+  const second = adjustBenjaminiHochberg([0.2, null, 0.01]);
+  assert.ok(first.every((value, index) => Math.abs(value - [0.03, 0.06, 0.2][index]) < 1e-12));
+  assert.ok(Math.abs(second[0] - 0.2) < 1e-12);
+  assert.equal(second[1], null);
+  assert.ok(Math.abs(second[2] - 0.02) < 1e-12);
 });

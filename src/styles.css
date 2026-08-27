@@ -190,6 +190,19 @@ h1 { color: var(--navy); font-size: clamp(24px, 2.1vw, 30px); line-height: 1.1; 
 .survival-footnote { display: flex; justify-content: space-between; gap: 12px; padding: 8px 15px 10px; border-top: 1px solid var(--soft-line); color: #8793a5; font-size: 9px; }
 .survival-footnote span:last-child { color: #6c7a90; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 8px; white-space: nowrap; }
 
+.segment-panel { overflow: hidden; }
+.segment-panel .panel-heading { border-bottom: 1px solid var(--soft-line); }
+.segment-table { margin: 10px 15px; overflow: hidden; border: 1px solid #e3e7ed; border-radius: 6px; }
+.segment-row { display: grid; grid-template-columns: 1.15fr repeat(4, 1fr); min-height: 26px; align-items: center; border-top: 1px solid var(--soft-line); color: #5d6b80; font-size: 9px; }
+.segment-row:first-child { border-top: 0; }
+.segment-row > * { min-width: 0; padding: 6px 8px; border-right: 1px solid var(--soft-line); }
+.segment-row > *:last-child { border-right: 0; }
+.segment-head { background: #fbfcfe; color: #8b97a8; font-size: 8px; }
+.segment-row strong { color: #3f4e65; font-weight: 750; }
+.segment-significant { color: var(--green); font-weight: 800; }
+.segment-footnote { display: flex; justify-content: space-between; gap: 12px; padding: 8px 15px 10px; border-top: 1px solid var(--soft-line); color: #8793a5; font-size: 9px; }
+.segment-footnote span:last-child { color: #6c7a90; white-space: nowrap; }
+
 .contract-panel { overflow: hidden; }
 .version-badge { padding: 3px 5px; border: 1px solid #d4dce8; border-radius: 4px; background: #f6f8fb; color: #7d8a9e; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 9px; }
 .contract-grid { padding: 0 15px; }
@@ -285,6 +298,9 @@ h1 { color: var(--navy); font-size: clamp(24px, 2.1vw, 30px); line-height: 1.1; 
   .formula-footnote { align-items: flex-start; flex-direction: column; }
   .survival-cards { grid-template-columns: 1fr; }
   .survival-footnote { align-items: flex-start; flex-direction: column; }
+  .segment-table { overflow-x: auto; }
+  .segment-row { min-width: 520px; }
+  .segment-footnote { align-items: flex-start; flex-direction: column; }
   .evidence-meta { grid-template-columns: repeat(2, 1fr); }
   .evidence-meta > div:nth-child(2n) { border-right: 0; }
   .evidence-meta > div:nth-child(n + 3) { border-top: 1px solid var(--soft-line); }

@@ -41,7 +41,7 @@ The local Vite API uses `JsonFilePersistence` and stores the current state in `.
 `POST /api/experiments/:id/import` accepts either JSON events or a CSV payload. The normalized event columns are:
 
 ```text
-type,subject_id,event_name,metric,value,occurred_at,variant
+type,subject_id,event_name,metric,value,period,censored,occurred_at,variant,dimensions
 ```
 
 Use `assignment`, `exposure`, and `outcome` as event types. Exposure events are deduplicated by subject and event name; outcome events can be made idempotent by providing `event_id` (or `id`). Import returns `received`, `accepted`, `skipped`, and row-level errors.
@@ -64,6 +64,12 @@ LTV = Σ [Survival(t) × Expected Contribution Margin(t)]
 ```
 
 The report endpoint includes the survival-based LTV table, observed subject counts, number of periods in each trace, and reproducible subject-level bootstrap intervals. Each bootstrap draw resamples users with all of their retention and contribution observations, preserving the within-user dependency. The output records the method, seed, draw count, confidence level, standard error, and interval for control, treatment, and their difference.
+
+## Subgroup analysis
+
+Outcome events may include a `dimensions` object such as `{ "device": "mobile", "source": "paid" }`. `GET /api/experiments/:id/segments?field=device` builds the same event-derived Survival LTV independently for each device value that has usable data in both variants. Subjects whose events disagree on the dimension are excluded from subgroup analysis and counted in `excludedAmbiguousSubjects`.
+
+Each subgroup receives a bootstrap sign-test p-value for the treatment-minus-control LTV difference. The API then applies Benjamini–Hochberg correction across the tested subgroups and exposes `rawPValue`, `adjustedPValue`, and `significant` at α = 0.05. This is an exploratory subgroup layer; it should not replace pre-registered interaction hypotheses or a properly powered primary analysis.
 
 ## Limitations
 

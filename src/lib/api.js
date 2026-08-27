@@ -2,7 +2,7 @@ import { assignVariant, analyzeExperiment, validateMetricContract } from "./expe
 import { ingestEvents } from "./eventAdapter.js";
 import { ApiError } from "./errors.js";
 import { buildExperimentReport, renderMarkdownReport } from "./report.js";
-import { analyzeSurvivalByVariant } from "./survival.js";
+import { adjustBenjaminiHochberg, analyzeSurvivalByVariant } from "./survival.js";
 
 const clone = (value) => JSON.parse(JSON.stringify(value));
 
@@ -33,6 +33,23 @@ function optionalBoolean(value, field) {
   if (value === 1 || value === "1" || String(value).toLowerCase() === "true") return true;
   if (value === 0 || value === "0" || String(value).toLowerCase() === "false") return false;
   throw new ApiError(400, `${field} must be a boolean`);
+}
+
+function optionalString(value, field) {
+  if (value === undefined || value === null || value === "") return undefined;
+  if (typeof value !== "string" || value.trim() === "") throw new ApiError(400, `${field} must be a non-empty string`);
+  return value.trim();
+}
+
+function optionalDimensions(value) {
+  if (value === undefined || value === null || value === "") return undefined;
+  if (typeof value !== "object" || Array.isArray(value)) throw new ApiError(400, "dimensions must be an object");
+  return clone(value);
+}
+
+function getDimensionValue(outcome, field) {
+  const value = field === "segment" ? outcome.segment ?? outcome.dimensions?.segment : outcome.dimensions?.[field];
+  return value === undefined || value === null || value === "" ? undefined : String(value);
 }
 
 function requireExperiment(experiments, id) {
@@ -174,6 +191,8 @@ export class ExperimentStore {
     if (!Number.isFinite(input.value)) throw new ApiError(400, "value must be a finite number");
     const period = optionalPeriod(input.period);
     const censored = optionalBoolean(input.censored, "censored");
+    const segment = optionalString(input.segment, "segment");
+    const dimensions = optionalDimensions(input.dimensions);
     const assignment = this.assign(id, subjectId);
     const outcome = {
       id: input.id ? requireString(input.id, "id") : makeId("outcome"),
@@ -185,6 +204,8 @@ export class ExperimentStore {
       occurredAt: input.occurredAt ?? now(),
       ...(period === undefined ? {} : { period }),
       ...(censored === undefined ? {} : { censored }),
+      ...(segment === undefined ? {} : { segment }),
+      ...(dimensions === undefined ? {} : { dimensions }),
     };
     const outcomes = this.outcomes.get(id);
     if (outcomes.has(outcome.id)) return clone(outcomes.get(outcome.id));
@@ -216,6 +237,61 @@ export class ExperimentStore {
     const complete = Object.values(variants).every(({ activityRecords, contributionRecords }) => activityRecords.length > 0 && contributionRecords.length > 0);
     if (!complete) return null;
     return analyzeSurvivalByVariant(variants);
+  }
+
+  getSegmentAnalysis(id, field = "segment") {
+    requireExperiment(this.experiments, id);
+    const segmentField = requireString(field, "field");
+    const outcomes = this.getOutcomeRecords(id);
+    const activityMetrics = new Set(["active", "activity", "retained", "retention"]);
+    const contributionMetrics = new Set(["contribution", "contribution_margin", "contribution_profit", "net_contribution"]);
+    const bySegment = new Map();
+    const subjectSegments = new Map();
+    const ambiguousSubjects = new Set();
+    outcomes.forEach((outcome) => {
+      if (!outcome.period || !["control", "treatment"].includes(outcome.variant)) return;
+      const segment = getDimensionValue(outcome, segmentField);
+      if (segment === undefined) return;
+      const subjectKey = `${outcome.variant}:${outcome.subjectId}`;
+      if (!subjectSegments.has(subjectKey)) subjectSegments.set(subjectKey, new Set());
+      subjectSegments.get(subjectKey).add(segment);
+    });
+    subjectSegments.forEach((segments, subjectKey) => {
+      if (segments.size > 1) ambiguousSubjects.add(subjectKey);
+    });
+    outcomes.forEach((outcome) => {
+      if (!outcome.period || !["control", "treatment"].includes(outcome.variant)) return;
+      const segment = getDimensionValue(outcome, segmentField);
+      if (segment === undefined) return;
+      const subjectKey = `${outcome.variant}:${outcome.subjectId}`;
+      if (ambiguousSubjects.has(subjectKey)) return;
+      if (!bySegment.has(segment)) bySegment.set(segment, { control: { activityRecords: [], contributionRecords: [] }, treatment: { activityRecords: [], contributionRecords: [] } });
+      const target = bySegment.get(segment)[outcome.variant];
+      const metric = outcome.metric.toLowerCase();
+      if (activityMetrics.has(metric)) target.activityRecords.push(outcome);
+      if (contributionMetrics.has(metric)) target.contributionRecords.push(outcome);
+    });
+    const candidates = [...bySegment.entries()]
+      .filter(([, variants]) => Object.values(variants).every(({ activityRecords, contributionRecords }) => activityRecords.length > 0 && contributionRecords.length > 0))
+      .map(([value, variants]) => {
+        const survivalLtv = analyzeSurvivalByVariant(variants);
+        return { value, ...survivalLtv, rawPValue: survivalLtv.uncertainty.difference.pValue };
+      });
+    const adjustedPValues = adjustBenjaminiHochberg(candidates.map((candidate) => candidate.rawPValue));
+    const segments = candidates.map((candidate, index) => ({
+      ...candidate,
+      adjustedPValue: adjustedPValues[index],
+      significant: adjustedPValues[index] !== null && adjustedPValues[index] <= 0.05,
+    }));
+    return {
+      ready: segments.length > 0,
+      field: segmentField,
+      correction: "Benjamini-Hochberg",
+      alpha: 0.05,
+      testedSegments: segments.length,
+      excludedAmbiguousSubjects: ambiguousSubjects.size,
+      segments,
+    };
   }
 
   getIngestionSummary(id) {
@@ -272,7 +348,7 @@ export async function handleApiRequest(request, store = defaultStore) {
     if (url.pathname === "/api/health" && request.method === "GET") return json({ ok: true, service: "evidence-console-api" });
     if (url.pathname === "/api/experiments" && request.method === "GET") return json({ experiments: store.listExperiments() });
     if (url.pathname === "/api/experiments" && request.method === "POST") { const experiment = store.createExperiment(await readJson(request)); await store.flush(); return json({ experiment }, 201); }
-    const match = url.pathname.match(/^\/api\/experiments\/([^/]+)(?:\/(assign|exposure|outcome|analysis|import|report))?$/);
+    const match = url.pathname.match(/^\/api\/experiments\/([^/]+)(?:\/(assign|exposure|outcome|analysis|segments|import|report))?$/);
     if (!match) throw new ApiError(404, "API route was not found");
     const [, id, action] = match;
     if (!action && request.method === "GET") return json({ experiment: store.getExperimentSummary(id) });
@@ -281,9 +357,12 @@ export async function handleApiRequest(request, store = defaultStore) {
     if (action === "outcome" && request.method === "POST") { const outcome = store.recordOutcome(id, await readJson(request)); await store.flush(); return json({ outcome }, 201); }
     if (action === "import" && request.method === "POST") { const result = store.importEvents(id, await readJson(request)); await store.flush(); return json({ result }, result.skipped > 0 ? 207 : 201); }
     if (action === "analysis" && request.method === "GET") return json({ analysis: store.getAnalysis(id) });
+    if (action === "segments" && request.method === "GET") return json({ analysis: store.getSegmentAnalysis(id, url.searchParams.get("field") ?? "segment") });
     if (action === "report" && request.method === "GET") {
       const analysis = store.getAnalysis(id);
-      const report = buildExperimentReport({ experiment: store.getExperiment(id), analysis });
+      const segmentField = url.searchParams.get("segmentField");
+      const segmentAnalysis = segmentField ? store.getSegmentAnalysis(id, segmentField) : null;
+      const report = buildExperimentReport({ experiment: store.getExperiment(id), analysis: segmentAnalysis ? { ...analysis, segmentAnalysis } : analysis });
       if (["md", "markdown"].includes(url.searchParams.get("format"))) return textResponse(renderMarkdownReport(report), 200, "text/markdown; charset=utf-8");
       return json({ report });
     }
