@@ -13,6 +13,7 @@ The current release is a runnable MVP built around one core job: help a product 
 - A Formula Trace that separates Revenue LTV from Contribution LTV.
 - Interactive LTV mode switching, snapshot selection, contract expansion, stage navigation, Decision Brief, and reproducible-report feedback.
 - A pure JavaScript analysis layer for deterministic assignment, SRM detection, binary Frequentist/Bayesian analysis, continuous-metric analysis, and Metric Contract validation.
+- A machine-readable, versioned Metric Contract schema exposed through the API and stored with every experiment.
 - Raw event analysis for retention/contribution observations, including a Kaplan–Meier survival curve and survival-based LTV.
 - Reproducible subject-level bootstrap intervals for survival-based LTV and its treatment effect.
 - Subgroup analysis by event dimensions with Benjamini–Hochberg multiple-comparison correction.
@@ -25,6 +26,7 @@ The Worker exposes a small JSON API for local development and future adapters:
 
 ```text
 GET  /api/health
+GET  /api/metric-contract/schema
 GET  /api/experiments
 POST /api/experiments
 GET  /api/experiments/:id
@@ -130,9 +132,8 @@ npm test
 
 This is an early open-source MVP, not a production experimentation service. The next implementation layers are:
 
-- machine-readable Metric Contract schemas;
 - warehouse adapters and event ingestion;
-- reproducible report export and CLI workflows.
+- CLI workflows and warehouse adapters.
 
 ## License
 

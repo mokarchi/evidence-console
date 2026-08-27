@@ -1,6 +1,7 @@
 import { assignVariant, analyzeExperiment, validateMetricContract } from "./experiment.js";
 import { ingestEvents } from "./eventAdapter.js";
 import { ApiError } from "./errors.js";
+import { metricContractSchema, normalizeMetricContract } from "./metricContract.js";
 import { buildExperimentReport, renderMarkdownReport } from "./report.js";
 import { adjustBenjaminiHochberg, analyzeSurvivalByVariant } from "./survival.js";
 
@@ -102,7 +103,7 @@ export class ExperimentStore {
 
   createExperiment(input = {}) {
     const name = requireString(input.name, "name");
-    const metricContract = input.metricContract ?? {};
+    const metricContract = normalizeMetricContract(input.metricContract ?? {});
     const contractStatus = validateMetricContract(metricContract);
     if (!contractStatus.valid) throw new ApiError(400, "metricContract is incomplete", contractStatus.errors);
     const id = input.id ? requireString(input.id, "id") : makeId("exp");
@@ -346,6 +347,7 @@ export async function handleApiRequest(request, store = defaultStore) {
   if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: { "access-control-allow-origin": "*", "access-control-allow-headers": "content-type", "access-control-allow-methods": "GET,POST,OPTIONS" } });
   try {
     if (url.pathname === "/api/health" && request.method === "GET") return json({ ok: true, service: "evidence-console-api" });
+    if (url.pathname === "/api/metric-contract/schema" && request.method === "GET") return json({ schema: metricContractSchema });
     if (url.pathname === "/api/experiments" && request.method === "GET") return json({ experiments: store.listExperiments() });
     if (url.pathname === "/api/experiments" && request.method === "POST") { const experiment = store.createExperiment(await readJson(request)); await store.flush(); return json({ experiment }, 201); }
     const match = url.pathname.match(/^\/api\/experiments\/([^/]+)(?:\/(assign|exposure|outcome|analysis|segments|import|report))?$/);

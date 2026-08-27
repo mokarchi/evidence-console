@@ -34,6 +34,18 @@ The demo object in `src/data/demoExperiment.js` separates:
 
 This separation prevents an outcome metric from silently changing its population or attribution window.
 
+## Versioned Metric Contract schema
+
+The canonical machine-readable schema is checked into [`schemas/metric-contract.v1.json`](../schemas/metric-contract.v1.json). Every stored contract is normalized to the `evidence-console.metric-contract/v1` schema version, so legacy create requests without a version are upgraded before persistence. Invalid types, unsupported fields, missing required fields, and out-of-range guardrails are rejected with row-level API details.
+
+The same schema is available to external tools without reading the repository:
+
+```text
+GET /api/metric-contract/schema
+```
+
+The core contract fields are `name`, `unit`, `definition`, `numerator`, `denominator`, `exposureEvent`, `attributionWindow`, and `guardrails`. Optional metadata includes `population`, `primary`, `analysisMethod`, `minimumDetectableEffect`, and `practicalSignificanceThreshold`. Reports expose both the report schema version and `metricContractSchemaVersion`.
+
 ## Persistence and event import
 
 The local Vite API uses `JsonFilePersistence` and stores the current state in `.data/experiments.json`. Writes use a temporary file followed by a rename, so a process restart can restore experiments and ingested events without committing local data to Git.

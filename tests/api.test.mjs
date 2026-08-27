@@ -14,6 +14,7 @@ test("creates an experiment and persists deterministic assignment", async () => 
   const createdResponse = await handleApiRequest(request("/api/experiments", { method: "POST", body: JSON.stringify({ name: "Checkout", metricContract: contract }) }), store);
   assert.equal(createdResponse.status, 201);
   const { experiment } = await createdResponse.json();
+  assert.equal(experiment.metricContract.schemaVersion, "evidence-console.metric-contract/v1");
 
   const first = await handleApiRequest(request(`/api/experiments/${experiment.id}/assign`, { method: "POST", body: JSON.stringify({ subjectId: "user_1" }) }), store);
   const second = await handleApiRequest(request(`/api/experiments/${experiment.id}/assign`, { method: "POST", body: JSON.stringify({ subjectId: "user_1" }) }), store);
@@ -21,6 +22,15 @@ test("creates an experiment and persists deterministic assignment", async () => 
   const secondAssignment = await second.json();
   assert.equal(firstAssignment.assignment.variant, secondAssignment.assignment.variant);
   assert.equal(firstAssignment.assignment.id, secondAssignment.assignment.id);
+});
+
+test("serves the machine-readable metric contract schema", async () => {
+  const response = await handleApiRequest(request("/api/metric-contract/schema"));
+  const payload = await response.json();
+  assert.equal(response.status, 200);
+  assert.equal(payload.schema.$id, "https://raw.githubusercontent.com/mokarchi/evidence-console/main/schemas/metric-contract.v1.json");
+  assert.equal(payload.schema.properties.schemaVersion.const, "evidence-console.metric-contract/v1");
+  assert.ok(payload.schema.required.includes("guardrails"));
 });
 
 test("records idempotent exposure and outcome events", async () => {
@@ -142,11 +152,13 @@ test("returns JSON and Markdown reports", async () => {
   const jsonPayload = await jsonResponse.json();
   assert.equal(jsonResponse.status, 200);
   assert.equal(jsonPayload.report.schemaVersion, "evidence-console.report/v1");
+  assert.equal(jsonPayload.report.metricContractSchemaVersion, "evidence-console.metric-contract/v1");
   assert.equal(jsonPayload.report.analysis.ltv.contribution.control.toFixed(2), "72.17");
 
   const markdownResponse = await handleApiRequest(request("/api/experiments/exp_report/report?format=md"), store);
   const markdown = await markdownResponse.text();
   assert.equal(markdownResponse.headers.get("content-type"), "text/markdown; charset=utf-8");
   assert.match(markdown, /## Metric contract/);
+  assert.match(markdown, /evidence-console\.metric-contract\/v1/);
   assert.match(markdown, /Contribution LTV/);
 });

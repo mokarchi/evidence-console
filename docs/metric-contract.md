@@ -2,21 +2,25 @@
 
 Metric Contracts make every number in an experiment report inspectable and reproducible.
 
+## Canonical schema
+
+The runtime contract is defined by [`schemas/metric-contract.v1.json`](../schemas/metric-contract.v1.json) and identified as `evidence-console.metric-contract/v1`. It is also available from a running API at `GET /api/metric-contract/schema`. This is the version stored alongside each experiment and included in exported reports.
+
 ## Required fields
 
 | Field | Meaning |
 | --- | --- |
-| `metric_id` | Stable identifier for the metric definition. |
-| `unit` | Randomization/analysis unit, usually `user` or `account`. |
-| `eligible_population` | Who is allowed into the denominator. |
+| `schemaVersion` | Immutable schema identifier for the contract shape. |
+| `name` | Human-readable metric name. |
+| `unit` | Analysis unit, usually `user` or `account`. |
+| `definition` | Plain-language statement of what the metric means. |
 | `numerator` | Exact event or value aggregation. |
 | `denominator` | Exact population count or exposure set. |
-| `window` | Attribution window and timezone. |
-| `revenue_basis` | Gross, net, refunded, tax, shipping, and currency rules. |
-| `cost_basis` | Variable costs included in Contribution LTV. |
-| `exclusions` | Test users, bots, duplicate events, or other filters. |
-| `primary_or_guardrail` | Whether the metric drives the decision or protects against harm. |
-| `analysis_method` | Frequentist, Bayesian, bootstrap, survival, or another method. |
+| `exposureEvent` | Event that starts eligibility and attribution. |
+| `attributionWindow` | Time window used to attribute outcomes. |
+| `guardrails` | SRM thresholds: `minSampleRatio` and `maxSrmPValue`. |
+
+Optional metadata includes `population`, `primary`, `analysisMethod`, `minimumDetectableEffect`, and `practicalSignificanceThreshold`.
 
 ## Canonical LTV definitions
 
@@ -39,18 +43,24 @@ LTV = Σ [P(active at t) × E(contribution margin at t)] / (1 + discount_rate)^t
 
 ## Example
 
-```yaml
-metric_id: ltv_90d_contribution_per_user
-unit: user
-eligible_population: users_with_first_exposure
-numerator: sum(order_revenue - variable_cost - payment_fee - refund_amount)
-denominator: exposed_users
-window: 90d_from_first_exposure
-revenue_basis: net_revenue_excluding_tax_and_shipping
-cost_basis: contribution_margin_after_variable_costs
-exclusions:
-  - is_test_user = false
-  - duplicate_exposure = false
-primary_or_guardrail: primary
-analysis_method: bayesian_difference_of_means
+```json
+{
+  "schemaVersion": "evidence-console.metric-contract/v1",
+  "name": "90-Day Contribution LTV per User",
+  "unit": "USD per exposed user",
+  "definition": "Total contribution margin attributable to a user within 90 days of first exposure.",
+  "numerator": "sum(order_revenue - variable_cost - payment_fee - refund_amount)",
+  "denominator": "exposed_users",
+  "exposureEvent": "checkout_view",
+  "attributionWindow": "90 days from first exposure",
+  "population": "users with a first checkout_view exposure",
+  "primary": true,
+  "analysisMethod": "survival plus subject-level bootstrap",
+  "minimumDetectableEffect": 0.05,
+  "practicalSignificanceThreshold": 0.03,
+  "guardrails": {
+    "minSampleRatio": 0.8,
+    "maxSrmPValue": 0.01
+  }
+}
 ```

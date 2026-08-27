@@ -1,0 +1,88 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/mokarchi/evidence-console/main/schemas/metric-contract.v1.json",
+  "title": "Evidence Console Metric Contract",
+  "description": "Versioned definition of an experiment metric and its analysis guardrails.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schemaVersion",
+    "name",
+    "unit",
+    "definition",
+    "numerator",
+    "denominator",
+    "exposureEvent",
+    "attributionWindow",
+    "guardrails"
+  ],
+  "properties": {
+    "schemaVersion": {
+      "const": "evidence-console.metric-contract/v1"
+    },
+    "name": {
+      "type": "string",
+      "minLength": 1
+    },
+    "unit": {
+      "type": "string",
+      "minLength": 1
+    },
+    "definition": {
+      "type": "string",
+      "minLength": 1
+    },
+    "numerator": {
+      "type": "string",
+      "minLength": 1
+    },
+    "denominator": {
+      "type": "string",
+      "minLength": 1
+    },
+    "exposureEvent": {
+      "type": "string",
+      "minLength": 1
+    },
+    "attributionWindow": {
+      "type": "string",
+      "minLength": 1
+    },
+    "population": {
+      "type": "string",
+      "minLength": 1
+    },
+    "primary": {
+      "type": "boolean"
+    },
+    "analysisMethod": {
+      "type": "string",
+      "minLength": 1
+    },
+    "minimumDetectableEffect": {
+      "type": "number",
+      "minimum": 0
+    },
+    "practicalSignificanceThreshold": {
+      "type": "number",
+      "minimum": 0
+    },
+    "guardrails": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["minSampleRatio", "maxSrmPValue"],
+      "properties": {
+        "minSampleRatio": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1
+        },
+        "maxSrmPValue": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1
+        }
+      }
+    }
+  }
+}

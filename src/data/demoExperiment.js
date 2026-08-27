@@ -3,6 +3,7 @@ export const demoExperiment = {
   name: "Checkout Redesign v1",
   allocation: 0.5,
   metricContract: {
+    schemaVersion: "evidence-console.metric-contract/v1",
     name: "90-Day Contribution LTV per User",
     unit: "USD",
     definition: "Total contribution margin attributable to a user within 90 days of first exposure.",
@@ -10,6 +11,11 @@ export const demoExperiment = {
     denominator: "# of exposed users",
     exposureEvent: "checkout_view",
     attributionWindow: "90 days from first exposure",
+    population: "users with a first checkout_view exposure",
+    primary: true,
+    analysisMethod: "survival plus subject-level bootstrap",
+    minimumDetectableEffect: 0.05,
+    practicalSignificanceThreshold: 0.03,
     guardrails: { minSampleRatio: 0.8, maxSrmPValue: 0.01 },
   },
   variants: {

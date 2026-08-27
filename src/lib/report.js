@@ -15,6 +15,7 @@ export function buildExperimentReport({ experiment, analysis, generatedAt = new 
   const seed = analysisInput?.conversion?.seed ?? null;
   return {
     schemaVersion: "evidence-console.report/v1",
+    metricContractSchemaVersion: experiment.metricContract?.schemaVersion ?? null,
     generatedAt,
     experiment: {
       id: experiment.id,
@@ -49,6 +50,7 @@ export function renderMarkdownReport(report) {
     `# Experiment report: ${experiment.name}`,
     "",
     `- Report schema: \`${report.schemaVersion}\``,
+    `- Metric Contract schema: \`${report.metricContractSchemaVersion ?? "unknown"}\``,
     `- Generated at: ${report.generatedAt}`,
     `- Experiment ID: \`${experiment.id}\``,
     `- Status: ${markdownValue(experiment.status)}`,

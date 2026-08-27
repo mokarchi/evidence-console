@@ -1,5 +1,8 @@
 import { calculateLtv, calculateAov, calculateLifetimeFromChurn, calculatePurchaseFrequency, buildLtvTrace } from "./ltv.js";
 import { analyzeBinary, analyzeContinuous, calculateSrm } from "./statistics.js";
+import { validateMetricContract } from "./metricContract.js";
+
+export { validateMetricContract } from "./metricContract.js";
 
 function hashString(value) {
   let hash = 2166136261;
@@ -14,13 +17,6 @@ export function assignVariant({ subjectId, experimentId, allocation = 0.5 }) {
   if (!subjectId || !experimentId || !Number.isFinite(allocation) || allocation <= 0 || allocation >= 1) return null;
   const bucket = hashString(`${experimentId}:${subjectId}`) / 4294967296;
   return bucket < allocation ? "control" : "treatment";
-}
-
-export function validateMetricContract(contract) {
-  const required = ["name", "unit", "definition", "numerator", "denominator", "exposureEvent", "attributionWindow"];
-  const errors = required.filter((field) => !contract?.[field]).map((field) => `${field} is required`);
-  if (contract?.guardrails && typeof contract.guardrails !== "object") errors.push("guardrails must be an object");
-  return { valid: errors.length === 0, errors };
 }
 
 function calculateVariantLtv(variant) {
