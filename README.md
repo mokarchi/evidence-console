@@ -6,6 +6,8 @@ The current release is a runnable MVP built around one core job: help a product 
 
 **[▶ Open the live demo](https://evidence-console-demo.mokarchi-gpt.chatgpt.site)** · Explore the complete flow: hypothesis, deterministic assignment, data-quality checks, Formula Trace for ARPC/AOV/Lifetime LTV, survival LTV, subgroup analysis, stopping-rule monitoring, and reproducible reports.
 
+The public demo is intentionally frontend-only: its seeded experiment, analysis engine, menus, and interactions run in the browser without requiring an API or backend.
+
 ## What is in this MVP
 
 - A four-stage experiment storyline: Hypothesis → Assignment → Evidence → Decision.

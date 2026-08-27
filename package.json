@@ -12,7 +12,7 @@
     "build": "vite build && vite build --config vite.worker.config.mjs && node scripts/prepare-sites-build.mjs",
     "preview": "vite preview",
     "test:sites": "node --test tests/sites-worker.test.mjs",
-    "test": "npm run test:sites && node --test tests/ltv.test.mjs tests/experiment.test.mjs tests/api.test.mjs tests/cli.test.mjs tests/monitoring.test.mjs tests/persistence.test.mjs tests/report.test.mjs tests/survival.test.mjs tests/warehouse.test.mjs"
+    "test": "npm run test:sites && node --test tests/ltv.test.mjs tests/experiment.test.mjs tests/api.test.mjs tests/cli.test.mjs tests/client-demo.test.mjs tests/monitoring.test.mjs tests/persistence.test.mjs tests/report.test.mjs tests/survival.test.mjs tests/warehouse.test.mjs"
   },
   "dependencies": {
     "@phosphor-icons/react": "2.1.7",
