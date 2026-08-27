@@ -70,6 +70,16 @@ npm run cli -- report --experiment <id> --format md --output report.md
 
 The CLI uses the same `ExperimentStore`, persistence format, event adapter, and report renderer as the API. It returns exit code `1` for validation or partial-import failures, making it suitable for a CI gate.
 
+## Warehouse adapter boundary
+
+`src/lib/warehouseAdapter.js` provides a dependency-free integration boundary for production event sources:
+
+- `buildWarehouseEventQuery(options)` creates a parameterized query for one experiment, optional time bounds, and a bounded row limit.
+- `SqlWarehouseAdapter({ query, table, parameterStyle })` executes that query through an injected warehouse client and normalizes common snake_case columns.
+- `importWarehouseEvents(store, experimentId, adapter, options)` routes normalized rows through the same idempotent `ingestEvents` path used by the API and returns source metadata with `evidence-console.warehouse-events/v1`.
+
+The adapter rejects unsafe table identifiers and rows returned for another experiment. It does not own authentication, connection pooling, partition scheduling, or persistence; the host application supplies those concerns and saves `store.snapshot()` after a successful import. Use `named` parameters for clients such as BigQuery, `numbered` for `$1`-style clients, or `positional` for `?`-style clients.
+
 ## Raw-event survival LTV
 
 When an experiment has no configured aggregate analysis input, the API can derive LTV directly from persisted outcome events. Add period-level outcomes using:

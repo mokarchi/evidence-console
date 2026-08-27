@@ -17,6 +17,7 @@ The current release is a runnable MVP built around one core job: help a product 
 - Raw event analysis for retention/contribution observations, including a Kaplan–Meier survival curve and survival-based LTV.
 - Reproducible subject-level bootstrap intervals for survival-based LTV and its treatment effect.
 - Subgroup analysis by event dimensions with Benjamini–Hochberg multiple-comparison correction.
+- A vendor-neutral SQL warehouse adapter with parameterized event queries and experiment-boundary checks.
 
 The analysis API and its assumptions are documented in [docs/analysis-engine.md](docs/analysis-engine.md).
 
@@ -67,6 +68,29 @@ npm run cli -- report --experiment exp_20260811_01 --format md --output experime
 ```
 
 The default data file is `.data/experiments.json`; override it with `--data path/to/experiments.json`. `validate` and `import` accept `-` as the input path to read from stdin. The package also exposes the `evidence-console` binary when installed or linked locally.
+
+## Warehouse adapter
+
+Production warehouse clients can be injected without coupling the analysis engine to one vendor SDK. `SqlWarehouseAdapter` accepts a query function that receives `{ sql, params }`, uses parameterized filters for experiment and time range, and maps common warehouse columns such as `event_type`, `subject_id`, and `occurred_at` into the event schema:
+
+```js
+import { SqlWarehouseAdapter, importWarehouseEvents } from "./src/lib/warehouseAdapter.js";
+
+const adapter = new SqlWarehouseAdapter({
+  table: "analytics.experiment_events",
+  parameterStyle: "named",
+  query: ({ sql, params }) => warehouseClient.query({ query: sql, params }),
+});
+
+const result = await importWarehouseEvents(store, "exp_20260811_01", adapter, {
+  since: "2026-08-01T00:00:00Z",
+  until: "2026-08-08T00:00:00Z",
+  limit: 10000,
+});
+await persistence.save(store.snapshot());
+```
+
+The adapter is intentionally a connection boundary: vendor-specific authentication, query execution, partition strategy, and scheduling remain in the host application. `parameterStyle` supports `named` (`@experiment_id`), `numbered` (`$1`), and `positional` (`?`) clients.
 
 Raw event imports can derive survival-based LTV when both variants contain period-level `retention` (or `active`) and `contribution_margin` (or `contribution`) outcomes. The optional fields are `period` (a positive integer) and `censored` (a boolean):
 
@@ -143,9 +167,10 @@ npm test
 
 ## Project status
 
-This is an early open-source MVP, not a production experimentation service. The next implementation layer is:
+This is an early open-source MVP, not a production experimentation service. The next implementation layers are:
 
-- warehouse adapters for production event sources.
+- vendor-specific connection packages and partitioned warehouse sync;
+- scheduled experiment monitoring and alert delivery.
 
 ## License
 
