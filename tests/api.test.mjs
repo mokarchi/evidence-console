@@ -105,6 +105,9 @@ test("derives survival LTV from raw retention and contribution events", async ()
   assert.equal(payload.analysis.result.survivalLtv.control.ltv, 13);
   assert.equal(payload.analysis.result.survivalLtv.treatment.ltv, 18);
   assert.equal(payload.analysis.result.survivalLtv.difference, 5);
+  assert.equal(payload.analysis.result.survivalLtv.uncertainty.method, "subject-level bootstrap");
+  assert.equal(payload.analysis.result.survivalLtv.uncertainty.draws, 1000);
+  assert.equal(payload.analysis.result.survivalLtv.uncertainty.difference.interval.length, 2);
 });
 
 test("returns JSON and Markdown reports", async () => {

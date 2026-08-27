@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { buildContributionByPeriod, buildKaplanMeier, calculateSurvivalLtv, buildSurvivalLtv } from "../src/lib/survival.js";
+import { analyzeSurvivalByVariant, buildContributionByPeriod, buildKaplanMeier, calculateSurvivalLtv, buildSurvivalLtv, bootstrapSurvivalLtv } from "../src/lib/survival.js";
 
 test("builds a Kaplan-Meier retention curve with events and censoring", () => {
   const result = buildKaplanMeier([
@@ -59,4 +59,46 @@ test("combines raw retention and contribution observations", () => {
   assert.equal(result.ltv, 15);
   assert.equal(result.survivalCurve.length, 2);
   assert.equal(result.components[1].survival, 0.5);
+});
+
+test("calculates deterministic subject-level bootstrap intervals", () => {
+  const input = {
+    control: {
+      activityRecords: [
+        { subjectId: "c1", period: 1, value: 1 },
+        { subjectId: "c1", period: 2, value: 0 },
+        { subjectId: "c2", period: 1, value: 1 },
+        { subjectId: "c2", period: 2, value: 1, censored: true },
+      ],
+      contributionRecords: [
+        { subjectId: "c1", period: 1, value: 10 },
+        { subjectId: "c1", period: 2, value: 4 },
+        { subjectId: "c2", period: 1, value: 12 },
+        { subjectId: "c2", period: 2, value: 8 },
+      ],
+    },
+    treatment: {
+      activityRecords: [
+        { subjectId: "t1", period: 1, value: 1 },
+        { subjectId: "t1", period: 2, value: 1, censored: true },
+        { subjectId: "t2", period: 1, value: 1 },
+        { subjectId: "t2", period: 2, value: 1, censored: true },
+      ],
+      contributionRecords: [
+        { subjectId: "t1", period: 1, value: 10 },
+        { subjectId: "t1", period: 2, value: 8 },
+        { subjectId: "t2", period: 1, value: 12 },
+        { subjectId: "t2", period: 2, value: 10 },
+      ],
+    },
+  };
+  const first = bootstrapSurvivalLtv({ ...input, seed: 42, draws: 200 });
+  const second = bootstrapSurvivalLtv({ ...input, seed: 42, draws: 200 });
+  assert.deepEqual(first, second);
+  assert.equal(first.method, "subject-level bootstrap");
+  assert.equal(first.draws, 200);
+  assert.equal(first.confidenceLevel, 0.95);
+  assert.equal(first.difference.interval.length, 2);
+  assert.ok(first.difference.standardError >= 0);
+  assert.deepEqual(analyzeSurvivalByVariant({ ...input, uncertainty: { seed: 42, draws: 200 } }).uncertainty, first);
 });

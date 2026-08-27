@@ -63,8 +63,8 @@ When an experiment has no configured aggregate analysis input, the API can deriv
 LTV = Σ [Survival(t) × Expected Contribution Margin(t)]
 ```
 
-The report endpoint includes the survival-based LTV table, observed subject counts, and number of periods in each trace. The implementation is intentionally transparent: it currently reports point estimates and does not yet attach confidence or credible intervals to the LTV product itself.
+The report endpoint includes the survival-based LTV table, observed subject counts, number of periods in each trace, and reproducible subject-level bootstrap intervals. Each bootstrap draw resamples users with all of their retention and contribution observations, preserving the within-user dependency. The output records the method, seed, draw count, confidence level, standard error, and interval for control, treatment, and their difference.
 
 ## Limitations
 
-The current engine is intentionally an MVP. It does not yet provide a production database adapter, correct for repeated peeking in a Frequentist workflow, or calculate uncertainty for the LTV product itself. The survival estimator should be validated against the warehouse’s cohort definitions and contribution attribution rules before using it for production decisions.
+The current engine is intentionally an MVP. It does not yet provide a production database adapter or correct for repeated peeking in a Frequentist workflow. The bootstrap interval is a point-estimate uncertainty summary, not a causal guarantee; the survival estimator should be validated against the warehouse’s cohort definitions and contribution attribution rules before using it for production decisions.

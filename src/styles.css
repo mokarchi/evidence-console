@@ -178,6 +178,18 @@ h1 { color: var(--navy); font-size: clamp(24px, 2.1vw, 30px); line-height: 1.1; 
 .formula-total strong { color: var(--blue); }
 .formula-footnote { justify-content: space-between; gap: 12px; padding: 8px 15px 10px; color: #8793a5; font-size: 9px; }
 
+.survival-panel { overflow: hidden; }
+.survival-panel .panel-heading { border-bottom: 1px solid var(--soft-line); }
+.survival-cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; padding: 10px 15px; }
+.survival-cards > div { min-width: 0; padding: 9px 10px; border: 1px solid #e0e5ec; border-radius: 7px; background: #fbfcfe; }
+.survival-cards > div:nth-child(2) { border-color: #cfe7d8; background: #f7fcf8; }
+.survival-cards span, .survival-cards small { display: block; color: #8995a7; font-size: 9px; }
+.survival-cards strong { display: block; margin-top: 6px; color: var(--navy); font-size: 17px; letter-spacing: -.03em; }
+.survival-cards small { margin-top: 5px; color: #647389; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 8px; white-space: nowrap; }
+.survival-difference { border-color: #c8d6ff !important; background: #f5f7ff !important; }
+.survival-footnote { display: flex; justify-content: space-between; gap: 12px; padding: 8px 15px 10px; border-top: 1px solid var(--soft-line); color: #8793a5; font-size: 9px; }
+.survival-footnote span:last-child { color: #6c7a90; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 8px; white-space: nowrap; }
+
 .contract-panel { overflow: hidden; }
 .version-badge { padding: 3px 5px; border: 1px solid #d4dce8; border-radius: 4px; background: #f6f8fb; color: #7d8a9e; font-family: ui-monospace, SFMono-Regular, Consolas, monospace; font-size: 9px; }
 .contract-grid { padding: 0 15px; }
@@ -271,6 +283,8 @@ h1 { color: var(--navy); font-size: clamp(24px, 2.1vw, 30px); line-height: 1.1; 
   .formula-equation { overflow-x: auto; justify-content: flex-start; padding-bottom: 12px; }
   .formula-group, .formula-result { min-width: 118px; }
   .formula-footnote { align-items: flex-start; flex-direction: column; }
+  .survival-cards { grid-template-columns: 1fr; }
+  .survival-footnote { align-items: flex-start; flex-direction: column; }
   .evidence-meta { grid-template-columns: repeat(2, 1fr); }
   .evidence-meta > div:nth-child(2n) { border-right: 0; }
   .evidence-meta > div:nth-child(n + 3) { border-top: 1px solid var(--soft-line); }

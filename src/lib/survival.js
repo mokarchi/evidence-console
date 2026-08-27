@@ -100,7 +100,87 @@ export function buildSurvivalLtv({ activityRecords = [], contributionRecords = [
   };
 }
 
-export function analyzeSurvivalByVariant({ control, treatment } = {}) {
+function createSeededRandom(seed) {
+  let state = (Number(seed) >>> 0) || 0x9e3779b9;
+  return () => {
+    state ^= state << 13;
+    state ^= state >>> 17;
+    state ^= state << 5;
+    return (state >>> 0) / 4294967296;
+  };
+}
+
+function quantile(values, probability) {
+  if (values.length === 0) return null;
+  const position = (values.length - 1) * probability;
+  const lower = Math.floor(position);
+  const upper = Math.ceil(position);
+  if (lower === upper) return values[lower];
+  return values[lower] + (values[upper] - values[lower]) * (position - lower);
+}
+
+function summarizeBootstrap(values, confidenceLevel) {
+  const sorted = [...values].sort((left, right) => left - right);
+  const alpha = (1 - confidenceLevel) / 2;
+  const mean = values.reduce((total, value) => total + value, 0) / values.length;
+  const variance = values.length > 1 ? values.reduce((total, value) => total + (value - mean) ** 2, 0) / (values.length - 1) : 0;
+  return {
+    mean,
+    standardError: Math.sqrt(variance),
+    interval: [quantile(sorted, alpha), quantile(sorted, 1 - alpha)],
+  };
+}
+
+function bootstrapVariantSamples({ activityRecords = [], contributionRecords = [] }, random, draws) {
+  const activityBySubject = new Map();
+  const contributionBySubject = new Map();
+  activityRecords.forEach((record) => {
+    const subjectId = String(record.subjectId);
+    if (!activityBySubject.has(subjectId)) activityBySubject.set(subjectId, []);
+    activityBySubject.get(subjectId).push(record);
+  });
+  contributionRecords.forEach((record) => {
+    const subjectId = String(record.subjectId);
+    if (!contributionBySubject.has(subjectId)) contributionBySubject.set(subjectId, []);
+    contributionBySubject.get(subjectId).push(record);
+  });
+  const subjects = [...activityBySubject.keys()];
+  const samples = [];
+  for (let draw = 0; draw < draws; draw += 1) {
+    const sampledActivity = [];
+    const sampledContribution = [];
+    for (let index = 0; index < subjects.length; index += 1) {
+      const sourceSubject = subjects[Math.floor(random() * subjects.length)];
+      const bootstrapSubject = `bootstrap_${draw}_${index}`;
+      for (const record of activityBySubject.get(sourceSubject) ?? []) sampledActivity.push({ ...record, subjectId: bootstrapSubject });
+      for (const record of contributionBySubject.get(sourceSubject) ?? []) sampledContribution.push({ ...record, subjectId: bootstrapSubject });
+    }
+    samples.push(buildSurvivalLtv({ activityRecords: sampledActivity, contributionRecords: sampledContribution }).ltv);
+  }
+  return samples;
+}
+
+export function bootstrapSurvivalLtv({ control, treatment, seed = 20260827, draws = 1000, confidenceLevel = 0.95 } = {}) {
+  const normalizedDraws = Number(draws);
+  const normalizedConfidence = Number(confidenceLevel);
+  if (!Number.isInteger(normalizedDraws) || normalizedDraws < 100) throw new Error("draws must be an integer greater than or equal to 100");
+  if (!Number.isFinite(normalizedConfidence) || normalizedConfidence <= 0 || normalizedConfidence >= 1) throw new Error("confidenceLevel must be between 0 and 1");
+  const random = createSeededRandom(seed);
+  const controlSamples = bootstrapVariantSamples(control, random, normalizedDraws);
+  const treatmentSamples = bootstrapVariantSamples(treatment, random, normalizedDraws);
+  const differenceSamples = controlSamples.map((value, index) => treatmentSamples[index] - value);
+  return {
+    method: "subject-level bootstrap",
+    seed: Number(seed) >>> 0,
+    draws: normalizedDraws,
+    confidenceLevel: normalizedConfidence,
+    control: summarizeBootstrap(controlSamples, normalizedConfidence),
+    treatment: summarizeBootstrap(treatmentSamples, normalizedConfidence),
+    difference: summarizeBootstrap(differenceSamples, normalizedConfidence),
+  };
+}
+
+export function analyzeSurvivalByVariant({ control, treatment, uncertainty = {} } = {}) {
   const controlResult = buildSurvivalLtv(control);
   const treatmentResult = buildSurvivalLtv(treatment);
   const difference = treatmentResult.ltv - controlResult.ltv;
@@ -109,5 +189,6 @@ export function analyzeSurvivalByVariant({ control, treatment } = {}) {
     treatment: treatmentResult,
     difference,
     relativeUplift: controlResult.ltv === 0 ? null : difference / controlResult.ltv,
+    uncertainty: bootstrapSurvivalLtv({ control, treatment, ...uncertainty }),
   };
 }

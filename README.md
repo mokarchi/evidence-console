@@ -14,6 +14,7 @@ The current release is a runnable MVP built around one core job: help a product 
 - Interactive LTV mode switching, snapshot selection, contract expansion, stage navigation, Decision Brief, and reproducible-report feedback.
 - A pure JavaScript analysis layer for deterministic assignment, SRM detection, binary Frequentist/Bayesian analysis, continuous-metric analysis, and Metric Contract validation.
 - Raw event analysis for retention/contribution observations, including a Kaplan–Meier survival curve and survival-based LTV.
+- Reproducible subject-level bootstrap intervals for survival-based LTV and its treatment effect.
 
 The analysis API and its assumptions are documented in [docs/analysis-engine.md](docs/analysis-engine.md).
 

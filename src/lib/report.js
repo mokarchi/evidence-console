@@ -2,6 +2,10 @@ function markdownValue(value) {
   return value === null || value === undefined || value === "" ? "—" : String(value);
 }
 
+function formatInterval(interval) {
+  return Array.isArray(interval) && interval.length === 2 && interval.every((value) => Number.isFinite(value)) ? `[$${interval[0].toFixed(2)}, $${interval[1].toFixed(2)}]` : "—";
+}
+
 export function buildExperimentReport({ experiment, analysis, generatedAt = new Date().toISOString() }) {
   const analysisInput = experiment.analysisInput ?? (experiment.variants && experiment.conversion && experiment.revenue ? {
     variants: experiment.variants,
@@ -114,17 +118,37 @@ export function renderMarkdownReport(report) {
         "",
         "`LTV = Σ [Survival(t) × Expected Contribution Margin(t)]`",
         "",
-        "| Variant | LTV |",
-        "| --- | ---: |",
-        `| Control | $${survivalLtv.control.ltv.toFixed(2)} |`,
-        `| Treatment | $${survivalLtv.treatment.ltv.toFixed(2)} |`,
-        `| Difference | $${survivalLtv.difference.toFixed(2)} |`,
-        `| Relative uplift | ${survivalLtv.relativeUplift === null ? "—" : `${(survivalLtv.relativeUplift * 100).toFixed(2)}%`} |`,
+      );
+      if (survivalLtv.uncertainty) {
+        const confidencePercent = `${(survivalLtv.uncertainty.confidenceLevel * 100).toFixed(0)}%`;
+        lines.push(
+          `| Variant | LTV | ${confidencePercent} bootstrap interval |`,
+          "| --- | ---: | ---: |",
+          `| Control | $${survivalLtv.control.ltv.toFixed(2)} | ${formatInterval(survivalLtv.uncertainty.control.interval)} |`,
+          `| Treatment | $${survivalLtv.treatment.ltv.toFixed(2)} | ${formatInterval(survivalLtv.uncertainty.treatment.interval)} |`,
+          `| Difference | $${survivalLtv.difference.toFixed(2)} | ${formatInterval(survivalLtv.uncertainty.difference.interval)} |`,
+          `| Relative uplift | ${survivalLtv.relativeUplift === null ? "—" : `${(survivalLtv.relativeUplift * 100).toFixed(2)}%`} | — |`,
+        );
+      } else {
+        lines.push(
+          "| Variant | LTV |",
+          "| --- | ---: |",
+          `| Control | $${survivalLtv.control.ltv.toFixed(2)} |`,
+          `| Treatment | $${survivalLtv.treatment.ltv.toFixed(2)} |`,
+          `| Difference | $${survivalLtv.difference.toFixed(2)} |`,
+          `| Relative uplift | ${survivalLtv.relativeUplift === null ? "—" : `${(survivalLtv.relativeUplift * 100).toFixed(2)}%`} |`,
+        );
+      }
+      lines.push(
         "",
         `- Control observed subjects: ${survivalLtv.control.subjectCount}`,
         `- Treatment observed subjects: ${survivalLtv.treatment.subjectCount}`,
         `- Control periods in trace: ${survivalLtv.control.components.length}`,
         `- Treatment periods in trace: ${survivalLtv.treatment.components.length}`,
+        ...(survivalLtv.uncertainty ? [
+          `- Uncertainty: ${survivalLtv.uncertainty.method}, ${survivalLtv.uncertainty.draws.toLocaleString()} draws, seed ${survivalLtv.uncertainty.seed}`,
+          `- Bootstrap standard error (difference): $${survivalLtv.uncertainty.difference.standardError.toFixed(2)}`,
+        ] : []),
       );
       if (survivalLtv.control.components.every((row) => Number.isFinite(row.survival) && Number.isFinite(row.expectedContribution)) && survivalLtv.treatment.components.every((row) => Number.isFinite(row.survival) && Number.isFinite(row.expectedContribution))) {
         const treatmentByPeriod = new Map(survivalLtv.treatment.components.map((row) => [row.period, row]));
