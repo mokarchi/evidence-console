@@ -13,6 +13,7 @@ The current release is a runnable MVP built around one core job: help a product 
 - A Formula Trace that separates Revenue LTV from Contribution LTV.
 - Interactive LTV mode switching, snapshot selection, contract expansion, stage navigation, Decision Brief, and reproducible-report feedback.
 - A pure JavaScript analysis layer for deterministic assignment, SRM detection, binary Frequentist/Bayesian analysis, continuous-metric analysis, and Metric Contract validation.
+- Raw event analysis for retention/contribution observations, including a Kaplan–Meier survival curve and survival-based LTV.
 
 The analysis API and its assumptions are documented in [docs/analysis-engine.md](docs/analysis-engine.md).
 
@@ -47,6 +48,19 @@ Reports can be fetched as JSON or Markdown:
 
 ```bash
 curl "http://localhost:4173/api/experiments/exp_20260811_01/report?format=md" -o experiment-report.md
+```
+
+Raw event imports can derive survival-based LTV when both variants contain period-level `retention` (or `active`) and `contribution_margin` (or `contribution`) outcomes. The optional fields are `period` (a positive integer) and `censored` (a boolean):
+
+```json
+{
+  "type": "outcome",
+  "subjectId": "user_123",
+  "metric": "retention",
+  "value": 1,
+  "period": 2,
+  "censored": false
+}
 ```
 
 GitHub Actions runs `npm test` and `npm run build` on pushes to `main` and on pull requests.
@@ -100,7 +114,6 @@ This is an early open-source MVP, not a production experimentation service. The 
 
 - machine-readable Metric Contract schemas;
 - warehouse adapters and event ingestion;
-- cohort retention and survival-based LTV estimators;
 - reproducible report export and CLI workflows.
 
 ## License

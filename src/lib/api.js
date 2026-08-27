@@ -2,6 +2,7 @@ import { assignVariant, analyzeExperiment, validateMetricContract } from "./expe
 import { ingestEvents } from "./eventAdapter.js";
 import { ApiError } from "./errors.js";
 import { buildExperimentReport, renderMarkdownReport } from "./report.js";
+import { analyzeSurvivalByVariant } from "./survival.js";
 
 const clone = (value) => JSON.parse(JSON.stringify(value));
 
@@ -17,6 +18,21 @@ function makeId(prefix) {
 function requireString(value, field) {
   if (typeof value !== "string" || value.trim() === "") throw new ApiError(400, `${field} is required`);
   return value.trim();
+}
+
+function optionalPeriod(value) {
+  if (value === undefined || value === null || value === "") return undefined;
+  const period = Number(value);
+  if (!Number.isInteger(period) || period < 1) throw new ApiError(400, "period must be a positive integer");
+  return period;
+}
+
+function optionalBoolean(value, field) {
+  if (value === undefined || value === null || value === "") return undefined;
+  if (typeof value === "boolean") return value;
+  if (value === 1 || value === "1" || String(value).toLowerCase() === "true") return true;
+  if (value === 0 || value === "0" || String(value).toLowerCase() === "false") return false;
+  throw new ApiError(400, `${field} must be a boolean`);
 }
 
 function requireExperiment(experiments, id) {
@@ -156,6 +172,8 @@ export class ExperimentStore {
     const subjectId = requireString(input.subjectId, "subjectId");
     const metric = requireString(input.metric, "metric");
     if (!Number.isFinite(input.value)) throw new ApiError(400, "value must be a finite number");
+    const period = optionalPeriod(input.period);
+    const censored = optionalBoolean(input.censored, "censored");
     const assignment = this.assign(id, subjectId);
     const outcome = {
       id: input.id ? requireString(input.id, "id") : makeId("outcome"),
@@ -165,6 +183,8 @@ export class ExperimentStore {
       metric,
       value: input.value,
       occurredAt: input.occurredAt ?? now(),
+      ...(period === undefined ? {} : { period }),
+      ...(censored === undefined ? {} : { censored }),
     };
     const outcomes = this.outcomes.get(id);
     if (outcomes.has(outcome.id)) return clone(outcomes.get(outcome.id));
@@ -175,6 +195,27 @@ export class ExperimentStore {
   importEvents(id, input) {
     requireExperiment(this.experiments, id);
     return ingestEvents(this, id, input);
+  }
+
+  getOutcomeRecords(id) {
+    requireExperiment(this.experiments, id);
+    return [...this.outcomes.get(id).values()].map((outcome) => clone(outcome));
+  }
+
+  getEventDerivedAnalysis(id) {
+    const outcomes = this.getOutcomeRecords(id);
+    const activityMetrics = new Set(["active", "activity", "retained", "retention"]);
+    const contributionMetrics = new Set(["contribution", "contribution_margin", "contribution_profit", "net_contribution"]);
+    const variants = { control: { activityRecords: [], contributionRecords: [] }, treatment: { activityRecords: [], contributionRecords: [] } };
+    outcomes.forEach((outcome) => {
+      if (!outcome.period || !variants[outcome.variant]) return;
+      const metric = outcome.metric.toLowerCase();
+      if (activityMetrics.has(metric)) variants[outcome.variant].activityRecords.push(outcome);
+      if (contributionMetrics.has(metric)) variants[outcome.variant].contributionRecords.push(outcome);
+    });
+    const complete = Object.values(variants).every(({ activityRecords, contributionRecords }) => activityRecords.length > 0 && contributionRecords.length > 0);
+    if (!complete) return null;
+    return analyzeSurvivalByVariant(variants);
   }
 
   getIngestionSummary(id) {
@@ -198,8 +239,11 @@ export class ExperimentStore {
   getAnalysis(id) {
     const experiment = requireExperiment(this.experiments, id);
     const ingestion = this.getIngestionSummary(id);
+    const survivalLtv = this.getEventDerivedAnalysis(id);
+    if (!experiment.analysisInput && survivalLtv) return { ready: true, mode: "event-derived", ingestion, result: { survivalLtv } };
     if (!experiment.analysisInput) return { ready: false, reason: "No aggregate analysis input configured", ingestion };
-    return { ready: true, ingestion, result: analyzeExperiment({ ...experiment.analysisInput, id: experiment.id, allocation: experiment.allocation, metricContract: experiment.metricContract }) };
+    const result = analyzeExperiment({ ...experiment.analysisInput, id: experiment.id, allocation: experiment.allocation, metricContract: experiment.metricContract });
+    return { ready: true, ingestion, result: survivalLtv ? { ...result, survivalLtv } : result };
   }
 }
 

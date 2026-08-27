@@ -8,7 +8,7 @@
     "build": "vite build && node scripts/prepare-sites-build.mjs",
     "preview": "vite preview",
     "test:sites": "node --test tests/sites-worker.test.mjs",
-    "test": "npm run test:sites && node --test tests/ltv.test.mjs tests/experiment.test.mjs tests/api.test.mjs tests/persistence.test.mjs tests/report.test.mjs"
+    "test": "npm run test:sites && node --test tests/ltv.test.mjs tests/experiment.test.mjs tests/api.test.mjs tests/persistence.test.mjs tests/report.test.mjs tests/survival.test.mjs"
   },
   "dependencies": {
     "@phosphor-icons/react": "2.1.7",

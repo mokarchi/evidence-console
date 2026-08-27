@@ -166,7 +166,7 @@ export function App() {
   const [decisionOpen, setDecisionOpen] = useState(false);
   const [toast, setToast] = useState("");
   const [liveData, setLiveData] = useState({ status: "loading", ingestion: null, analysis: null, error: "" });
-  const liveStatusCopy = liveData.status === "loading" ? "Connecting to API…" : liveData.status === "ready" ? `API connected · ${liveData.ingestion.assignments} assignments · ${liveData.ingestion.exposures} exposures · ${liveData.ingestion.outcomes} outcomes` : "API offline · showing seeded snapshot";
+  const liveStatusCopy = liveData.status === "loading" ? "Connecting to API…" : liveData.status === "ready" ? `API connected · ${liveData.ingestion.assignments} assignments · ${liveData.ingestion.exposures} exposures · ${liveData.ingestion.outcomes} outcomes${liveData.analysis?.result?.survivalLtv ? " · Survival LTV ready" : ""}` : "API offline · showing seeded snapshot";
   const activeStageCopy = useMemo(() => `${stages.find((stage) => stage.id === activeStage)?.copy} · ${liveStatusCopy}`, [activeStage, liveStatusCopy]);
 
   useEffect(() => {

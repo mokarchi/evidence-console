@@ -44,6 +44,20 @@ function normalizeSubjectId(row) {
   return row.subjectId ?? row.subject_id ?? row.user_id ?? row.userId;
 }
 
+function optionalNumber(value) {
+  if (value === undefined || value === null || value === "") return undefined;
+  return Number(value);
+}
+
+function optionalBoolean(value) {
+  if (value === undefined || value === null || value === "") return undefined;
+  if (typeof value === "boolean") return value;
+  const normalized = String(value).toLowerCase();
+  if (["true", "1", "yes"].includes(normalized)) return true;
+  if (["false", "0", "no"].includes(normalized)) return false;
+  return value;
+}
+
 export function ingestEvents(store, experimentId, input = {}) {
   const rows = input.format === "csv" ? parseCsv(input.data) : input.events;
   if (!Array.isArray(rows)) throw new ApiError(400, "events must be an array or provide format=csv with data");
@@ -58,7 +72,15 @@ export function ingestEvents(store, experimentId, input = {}) {
         store.recordExposure(experimentId, { subjectId, variant: row.variant, eventName: row.eventName ?? row.event_name, occurredAt: row.occurredAt ?? row.occurred_at });
       } else if (type === "outcome") {
         const value = typeof row.value === "number" ? row.value : Number(row.value);
-        store.recordOutcome(experimentId, { id: row.id ?? row.event_id, subjectId, metric: row.metric, value, occurredAt: row.occurredAt ?? row.occurred_at });
+        store.recordOutcome(experimentId, {
+          id: row.id ?? row.event_id,
+          subjectId,
+          metric: row.metric,
+          value,
+          period: optionalNumber(row.period),
+          censored: optionalBoolean(row.censored),
+          occurredAt: row.occurredAt ?? row.occurred_at,
+        });
       } else {
         result.skipped += 1;
         result.errors.push({ row: index + 1, message: "type must be assignment, exposure, or outcome" });

@@ -48,6 +48,23 @@ Use `assignment`, `exposure`, and `outcome` as event types. Exposure events are 
 
 `GET /api/experiments/:id/report` returns a versioned JSON report by default. Add `?format=md` to receive a downloadable Markdown report containing the metric contract, ingestion summary, LTV trace, conversion analysis, data-quality result, and Bayesian seed.
 
+## Raw-event survival LTV
+
+When an experiment has no configured aggregate analysis input, the API can derive LTV directly from persisted outcome events. Add period-level outcomes using:
+
+- `retention` or `active`: `value > 0.5` means active; the first non-censored value at or below `0.5` is a churn event.
+- `contribution_margin` or `contribution`: contribution margin for that user and period. The MVP normalizes one observation per user-period.
+- `period`: a positive integer such as week 1, week 2, or month 1.
+- `censored`: optional boolean indicating that the observation ended without an observed churn event.
+
+`GET /api/experiments/:id/analysis` returns `mode: "event-derived"` and calculates a Kaplan–Meier retention curve for each variant. The LTV trace is:
+
+```text
+LTV = Σ [Survival(t) × Expected Contribution Margin(t)]
+```
+
+The report endpoint includes the survival-based LTV table, observed subject counts, and number of periods in each trace. The implementation is intentionally transparent: it currently reports point estimates and does not yet attach confidence or credible intervals to the LTV product itself.
+
 ## Limitations
 
-The current engine is intentionally an MVP. It does not yet provide a production database adapter, correct for repeated peeking in a Frequentist workflow, model retention as a survival curve, or calculate uncertainty for the LTV product itself. Those layers should be added before using the project for production decisions.
+The current engine is intentionally an MVP. It does not yet provide a production database adapter, correct for repeated peeking in a Frequentist workflow, or calculate uncertainty for the LTV product itself. The survival estimator should be validated against the warehouse’s cohort definitions and contribution attribution rules before using it for production decisions.

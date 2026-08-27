@@ -59,10 +59,10 @@ test("returns useful validation errors", async () => {
 test("imports CSV assignment, exposure, and outcome events", async () => {
   const store = new ExperimentStore([{ id: "exp_import", name: "Import test", metricContract: contract }]);
   const csv = [
-    "type,subject_id,event_name,metric,value,occurred_at",
-    "assignment,user_csv_1,,,,2026-08-25T09:00:00.000Z",
-    "exposure,user_csv_1,checkout_view,,,2026-08-25T09:01:00.000Z",
-    "outcome,user_csv_1,,purchase_conversion,1,2026-08-25T09:10:00.000Z",
+    "type,subject_id,event_name,metric,value,period,censored,occurred_at",
+    "assignment,user_csv_1,,,,,,2026-08-25T09:00:00.000Z",
+    "exposure,user_csv_1,checkout_view,,,,,2026-08-25T09:01:00.000Z",
+    "outcome,user_csv_1,,purchase_conversion,1,1,false,2026-08-25T09:10:00.000Z",
   ].join("\n");
   const response = await handleApiRequest(request("/api/experiments/exp_import/import", { method: "POST", body: JSON.stringify({ format: "csv", data: csv }) }), store);
   const payload = await response.json();
@@ -70,6 +70,41 @@ test("imports CSV assignment, exposure, and outcome events", async () => {
   assert.deepEqual(payload.result, { received: 3, accepted: 3, skipped: 0, errors: [] });
   const summary = await handleApiRequest(request("/api/experiments/exp_import"), store);
   assert.equal((await summary.json()).experiment.ingestion.outcomes, 1);
+  assert.equal(store.getOutcomeRecords("exp_import")[0].period, 1);
+  assert.equal(store.getOutcomeRecords("exp_import")[0].censored, false);
+});
+
+test("derives survival LTV from raw retention and contribution events", async () => {
+  const store = new ExperimentStore([{ id: "exp_survival", name: "Survival test", metricContract: contract }]);
+  const findSubject = (variant, prefix) => {
+    for (let index = 1; index <= 100; index += 1) {
+      const subjectId = `${prefix}_${index}`;
+      if (store.assign("exp_survival", subjectId).variant === variant) return subjectId;
+    }
+    throw new Error(`Could not find ${variant} assignment`);
+  };
+  const subjects = {
+    control: [findSubject("control", "control_a"), findSubject("control", "control_b")],
+    treatment: [findSubject("treatment", "treatment_a"), findSubject("treatment", "treatment_b")],
+  };
+  const events = Object.entries(subjects).flatMap(([variant, ids]) => ids.flatMap((subjectId, index) => [
+    { type: "exposure", subjectId, eventName: "checkout_view" },
+    { type: "outcome", id: `${variant}_${index}_retention_1`, subjectId, metric: "retention", value: 1, period: 1 },
+    { type: "outcome", id: `${variant}_${index}_contribution_1`, subjectId, metric: "contribution_margin", value: 10, period: 1 },
+    { type: "outcome", id: `${variant}_${index}_retention_2`, subjectId, metric: "retention", value: variant === "control" && index === 0 ? 0 : 1, period: 2, censored: variant !== "control" || index === 1 },
+    { type: "outcome", id: `${variant}_${index}_contribution_2`, subjectId, metric: "contribution_margin", value: variant === "control" ? 6 : 8, period: 2 },
+  ]));
+  const importResponse = await handleApiRequest(request("/api/experiments/exp_survival/import", { method: "POST", body: JSON.stringify({ events }) }), store);
+  assert.equal(importResponse.status, 201);
+  assert.equal((await importResponse.json()).result.accepted, events.length);
+
+  const response = await handleApiRequest(request("/api/experiments/exp_survival/analysis"), store);
+  const payload = await response.json();
+  assert.equal(payload.analysis.ready, true);
+  assert.equal(payload.analysis.mode, "event-derived");
+  assert.equal(payload.analysis.result.survivalLtv.control.ltv, 13);
+  assert.equal(payload.analysis.result.survivalLtv.treatment.ltv, 18);
+  assert.equal(payload.analysis.result.survivalLtv.difference, 5);
 });
 
 test("returns JSON and Markdown reports", async () => {

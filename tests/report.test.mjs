@@ -27,3 +27,27 @@ test("renders a report with auditable metric and analysis sections", () => {
   assert.match(markdown, /Bayesian P\(Treatment > Control\)/);
   assert.match(markdown, /Raw event data: not included/);
 });
+
+test("renders a report for event-derived survival LTV", () => {
+  const report = buildExperimentReport({
+    experiment: { ...demoExperiment, analysisInput: null },
+    analysis: {
+      ready: true,
+      mode: "event-derived",
+      ingestion: { assignments: 4, exposures: 4, outcomes: 16, variants: { control: 2, treatment: 2 }, outcomeMetrics: ["retention", "contribution_margin"] },
+      result: {
+        survivalLtv: {
+          control: { ltv: 13, subjectCount: 2, components: [{ period: 1 }, { period: 2 }] },
+          treatment: { ltv: 18, subjectCount: 2, components: [{ period: 1 }, { period: 2 }] },
+          difference: 5,
+          relativeUplift: 5 / 13,
+        },
+      },
+    },
+    generatedAt: "2026-08-27T00:00:00.000Z",
+  });
+  const markdown = renderMarkdownReport(report);
+  assert.match(markdown, /Survival-based LTV/);
+  assert.match(markdown, /Survival\(t\)/);
+  assert.match(markdown, /Raw event data: summarized/);
+});
