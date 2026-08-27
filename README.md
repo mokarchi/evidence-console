@@ -4,6 +4,8 @@ Evidence Console is an open-source workspace for designing, validating, and revi
 
 The current release is a runnable MVP built around one core job: help a product or data team decide whether an experiment should ship without hiding the assumptions behind the result.
 
+**[▶ Open the live demo](https://evidence-console-demo.mokarchi-gpt.chatgpt.site)** · Explore the complete flow: hypothesis, deterministic assignment, data-quality checks, Formula Trace for ARPC/AOV/Lifetime LTV, survival LTV, subgroup analysis, stopping-rule monitoring, and reproducible reports.
+
 ## What is in this MVP
 
 - A four-stage experiment storyline: Hypothesis → Assignment → Evidence → Decision.
